@@ -3,11 +3,14 @@
 RAG app with chat (default) and document ingestion interfaces. Config via env vars, no admin UI.
 
 ## Stack
-- Frontend: React + Vite + Tailwind + shadcn/ui
+- Frontend: SvelteKit + Tailwind + shadcn-svelte
 - Backend: Python + FastAPI
 - Database: Supabase (Postgres, pgvector, Auth, Storage, Realtime)
 - LLM: OpenAI (Module 1), OpenRouter (Module 2+)
 - Observability: LangSmith
+
+## Context Usage
+- Notify the user when context usage reaches 50% - stop and alert them before continuing
 
 ## Rules
 - Python backend must use a `venv` virtual environment
