@@ -2,7 +2,6 @@
 
 Build an agentic RAG application from scratch by collaborating with Claude Code. Follow along with our video series using the docs in this repo.
 
-[![Claude Code RAG Masterclass](./video-thumbnail.png)](https://www.youtube.com/watch?v=xgPWCuqLoek)
 
 [Watch the full video on YouTube](https://www.youtube.com/watch?v=xgPWCuqLoek)
 
@@ -23,7 +22,7 @@ A hands-on course where you collaborate with Claude Code to build a full-feature
 
 | Layer | Tech |
 |-------|------|
-| Frontend | React, TypeScript, Tailwind, shadcn/ui, Vite |
+| Frontend | Svelte, TypeScript, Tailwind, shadcn-svelte |
 | Backend | Python, FastAPI |
 | Database | Supabase (Postgres + pgvector + Auth + Storage) |
 | Doc Processing | Docling |
