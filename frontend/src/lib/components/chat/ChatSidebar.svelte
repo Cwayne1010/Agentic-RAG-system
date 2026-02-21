@@ -1,9 +1,10 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { apiRequest } from '$lib/api';
+	import { apiRequest, deleteConversation } from '$lib/api';
 	import { conversations, activeConversationId, messages } from '$lib/stores/conversations';
 	import { Button } from '$lib/components/ui/button';
 	import { Separator } from '$lib/components/ui/separator';
+	import { Trash2 } from '@lucide/svelte';
 	import type { Conversation, Message } from '../../../types';
 
 	async function loadConversations() {
@@ -22,6 +23,19 @@
 			messages.set(data);
 		} catch (e) {
 			console.error('Failed to load messages:', e);
+		}
+	}
+
+	async function removeConversation(id: string) {
+		try {
+			await deleteConversation(id);
+			conversations.update((list) => list.filter((c) => c.id !== id));
+			if ($activeConversationId === id) {
+				activeConversationId.set(null);
+				messages.set([]);
+			}
+		} catch (e) {
+			console.error('Failed to delete conversation:', e);
 		}
 	}
 
@@ -50,9 +64,27 @@
 </script>
 
 <div class="flex h-full w-60 flex-col border-r bg-muted/30">
-	<!-- Header -->
+	<!-- Nav links -->
+	<div class="space-y-1 p-3">
+		<a
+			href="/"
+			class="bg-accent flex w-full items-center rounded-md px-3 py-2 text-sm font-medium"
+		>
+			Chat
+		</a>
+		<a
+			href="/documents"
+			class="text-muted-foreground hover:bg-accent hover:text-foreground flex w-full items-center rounded-md px-3 py-2 text-sm transition-colors"
+		>
+			Documents
+		</a>
+	</div>
+
+	<Separator />
+
+	<!-- New chat -->
 	<div class="p-3">
-		<Button onclick={newConversation} class="w-full" variant="outline" size="sm">
+		<Button onclick={newConversation} class="w-full rounded-full" size="sm">
 			+ New Chat
 		</Button>
 	</div>
@@ -62,15 +94,29 @@
 	<!-- Conversation list -->
 	<div class="flex-1 overflow-y-auto py-2">
 		{#each $conversations as conv (conv.id)}
-			<button
-				type="button"
-				class="w-full truncate px-3 py-2 text-left text-sm transition-colors hover:bg-accent {$activeConversationId === conv.id
-					? 'bg-accent font-medium'
-					: 'text-muted-foreground'}"
-				onclick={() => selectConversation(conv.id)}
+			<div
+				class="group flex items-center gap-1 px-3 py-2 transition-colors hover:bg-accent {$activeConversationId === conv.id
+					? 'bg-accent'
+					: ''}"
 			>
-				{conv.title}
-			</button>
+				<button
+					type="button"
+					class="min-w-0 flex-1 truncate text-left text-sm {$activeConversationId === conv.id
+						? 'font-medium'
+						: 'text-muted-foreground'}"
+					onclick={() => selectConversation(conv.id)}
+				>
+					{conv.title}
+				</button>
+				<button
+					type="button"
+					class="text-muted-foreground hover:text-destructive shrink-0 opacity-0 transition-opacity group-hover:opacity-100"
+					onclick={(e) => { e.stopPropagation(); removeConversation(conv.id); }}
+					aria-label="Delete conversation"
+				>
+					<Trash2 class="h-3.5 w-3.5" />
+				</button>
+			</div>
 		{/each}
 
 		{#if $conversations.length === 0}

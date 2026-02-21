@@ -39,5 +39,24 @@ RAG app with chat (default) and document ingestion interfaces. Config via env va
 3. **Validate** - Test and verify the implementation works correctly. Use browser testing where applicable via an appropriate MCP
 4. **Iterate** - Fix any issues found during validation
 
+## Testing
+- Always output the full test code/commands for the user to run manually (SQL to paste into Supabase dashboard, curl commands, browser steps, etc.)
+- Do not assume tests can be run automatically — surface them explicitly so the user can execute them
+
+## Dev Commands
+**Restart backend:**
+```bash
+cd backend && source venv/bin/activate && uvicorn app.main:app --reload
+```
+
 ## Progress
 Check PROGRESS.md for current module status. Update it as you complete tasks.
+
+## Test Credentials
+For browser testing and validation
+- **Email** flocker@login.com
+- **Password** flocker
+
+For testing the isolation of data between users
+- **Email** clocker@login.com
+- **Password** clocker

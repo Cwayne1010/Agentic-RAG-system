@@ -1,12 +1,13 @@
 from langsmith import traceable
-from .claude_service import stream_response
+from .openrouter_service import stream_chat
 from typing import AsyncGenerator
 
 
-@traceable(name="module1_chat", run_type="llm")
-async def traced_stream_response(
+@traceable(name="module2_chat", run_type="llm")
+async def traced_stream_chat(
     messages: list[dict],
     conversation_id: str,
-) -> AsyncGenerator[str, None]:
-    async for text in stream_response(messages):
-        yield text
+    use_tools: bool = True,
+) -> AsyncGenerator[dict, None]:
+    async for event in stream_chat(messages, use_tools=use_tools):
+        yield event

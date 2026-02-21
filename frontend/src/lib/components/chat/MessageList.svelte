@@ -13,13 +13,9 @@
 </script>
 
 <div bind:this={scrollEl} class="flex-1 overflow-y-auto p-4">
-	{#if $messages.length === 0}
-		<div class="flex h-full items-center justify-center">
-			<p class="text-muted-foreground text-sm">Send a message to start the conversation</p>
-		</div>
-	{:else}
+	<div class="mx-auto max-w-3xl">
 		{#each $messages as message (message.id)}
 			<MessageBubble {message} />
 		{/each}
-	{/if}
+	</div>
 </div>

@@ -35,5 +35,10 @@ Track your progress through the masterclass. Update this file as you complete mo
 4. Start backend: `cd backend && source venv/bin/activate && uvicorn app.main:app --reload`
 5. Start frontend: `cd frontend && npm run dev`
 
-### Module 2: Document Ingestion
-- [ ] Not started
+### Module 2: BYO Retrieval + Memory
+
+- [x] Phase 1: DB schema (documents + document_chunks + pgvector RPC) + Supabase Storage bucket
+- [x] Phase 2: LLM switch — Claude → OpenRouter (openrouter_service.py, updated chat.py, langsmith_service.py, deleted claude_service.py, installed openai + python-multipart)
+- [x] Phase 3: Document ingestion backend (embedding_service.py, chunking_service.py, ingestion_service.py, models/document.py, routers/documents.py, main.py updated)
+- [x] Phase 4: Retrieval tool + RAG chat integration (retrieval_service.py + chat.py tool-call loop)
+- [x] Phase 5: Frontend ingestion UI (documents route, FileUploadZone, DocumentList, Supabase Realtime, nav)

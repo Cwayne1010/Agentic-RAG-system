@@ -1,4 +1,5 @@
 import { supabase } from './supabase';
+import type { Document } from '../types';
 
 async function getAuthHeader(): Promise<string> {
 	const { data } = await supabase.auth.getSession();
@@ -90,4 +91,60 @@ export async function streamChat(
 		if ((e as Error).name === 'AbortError') return;
 		onError(String(e));
 	}
+}
+
+export async function uploadDocument(file: File): Promise<Document> {
+	const authorization = await getAuthHeader();
+	const formData = new FormData();
+	formData.append('file', file);
+	const res = await fetch('/api/documents/upload', {
+		method: 'POST',
+		headers: { Authorization: authorization },
+		body: formData,
+	});
+	if (!res.ok) {
+		const text = await res.text();
+		throw new Error(`Upload error ${res.status}: ${text}`);
+	}
+	return res.json();
+}
+
+export async function listDocuments(): Promise<Document[]> {
+	return apiRequest<Document[]>('/api/documents');
+}
+
+export async function deleteDocument(id: string): Promise<void> {
+	await apiRequest(`/api/documents/${id}`, { method: 'DELETE' });
+}
+
+export async function deleteConversation(id: string): Promise<void> {
+	await apiRequest(`/api/conversations/${id}`, { method: 'DELETE' });
+}
+
+export interface AppSettings {
+	embedding_model: string;
+	chat_model: string;
+	embedding_locked: boolean;
+}
+
+export async function getSettings(): Promise<AppSettings> {
+	return apiRequest<AppSettings>('/api/settings');
+}
+
+export async function updateSettings(
+	data: Partial<Pick<AppSettings, 'embedding_model' | 'chat_model'>>,
+): Promise<AppSettings> {
+	return apiRequest<AppSettings>('/api/settings', {
+		method: 'PATCH',
+		body: JSON.stringify(data),
+	});
+}
+
+export async function validateChatModel(
+	model_id: string,
+): Promise<{ valid: boolean; name?: string }> {
+	return apiRequest('/api/settings/validate-model', {
+		method: 'POST',
+		body: JSON.stringify({ model_id }),
+	});
 }

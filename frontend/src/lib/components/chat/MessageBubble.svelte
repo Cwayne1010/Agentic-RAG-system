@@ -2,6 +2,8 @@
 	import { marked } from 'marked';
 	import type { Message } from '../../../types';
 
+	marked.setOptions({ breaks: true });
+
 	let { message }: { message: Message } = $props();
 
 	const isUser = $derived(message.role === 'user');

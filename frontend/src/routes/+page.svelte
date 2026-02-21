@@ -96,9 +96,7 @@
 				<MessageList />
 			{:else}
 				<div class="flex flex-1 items-center justify-center">
-					<div class="text-center">
-						<p class="text-muted-foreground text-sm">Select a conversation or create a new one</p>
-					</div>
+					<MessageInput onsend={handleSend} onstop={handleStop} />
 				</div>
 			{/if}
 		</div>
@@ -109,8 +107,7 @@
 		<div class="flex w-60 shrink-0 items-center border-r p-4">
 			<Button
 				onclick={() => supabase.auth.signOut()}
-				variant="ghost"
-				class="text-muted-foreground h-[44px] w-full"
+				class="h-[44px] w-full rounded-full"
 			>
 				Logout
 			</Button>
@@ -118,7 +115,7 @@
 		{#if $activeConversationId}
 			<MessageInput onsend={handleSend} onstop={handleStop} />
 		{:else}
-			<div class="flex-1"></div>
+			<div class="flex-1" />
 		{/if}
 	</div>
 </div>
