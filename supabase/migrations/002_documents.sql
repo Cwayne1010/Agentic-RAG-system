@@ -51,6 +51,10 @@ create trigger documents_updated_at
   before update on documents
   for each row execute function update_updated_at();
 
+-- Realtime: enable documents table for live status updates
+alter publication supabase_realtime add table documents;
+alter table documents replica identity full;
+
 -- Vector similarity search index
 create index on document_chunks using ivfflat (embedding vector_cosine_ops)
   with (lists = 100);

@@ -103,8 +103,14 @@ export async function uploadDocument(file: File): Promise<Document> {
 		body: formData,
 	});
 	if (!res.ok) {
-		const text = await res.text();
-		throw new Error(`Upload error ${res.status}: ${text}`);
+		let message: string;
+		try {
+			const body = await res.json();
+			message = body.detail ?? `Upload failed (${res.status})`;
+		} catch {
+			message = await res.text();
+		}
+		throw new Error(message);
 	}
 	return res.json();
 }
@@ -125,15 +131,18 @@ export interface AppSettings {
 	embedding_model: string;
 	chat_model: string;
 	embedding_locked: boolean;
+	llm_base_url: string;
+	llm_api_key: string;
+	embedding_base_url: string;
+	embedding_api_key: string;
+	embedding_dimensions: number;
 }
 
 export async function getSettings(): Promise<AppSettings> {
 	return apiRequest<AppSettings>('/api/settings');
 }
 
-export async function updateSettings(
-	data: Partial<Pick<AppSettings, 'embedding_model' | 'chat_model'>>,
-): Promise<AppSettings> {
+export async function updateSettings(data: Partial<AppSettings>): Promise<AppSettings> {
 	return apiRequest<AppSettings>('/api/settings', {
 		method: 'PATCH',
 		body: JSON.stringify(data),

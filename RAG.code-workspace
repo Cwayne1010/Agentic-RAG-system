@@ -1,0 +1,12 @@
+{
+	"folders": [
+		{
+			"path": "."
+		},
+		{
+			"name": "ccstatusline",
+			"path": "../ccstatusline"
+		}
+	],
+	"settings": {}
+}

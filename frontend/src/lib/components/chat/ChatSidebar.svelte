@@ -39,18 +39,9 @@
 		}
 	}
 
-	async function newConversation() {
-		try {
-			const conv = await apiRequest<Conversation>('/api/conversations', {
-				method: 'POST',
-				body: JSON.stringify({ title: 'New Chat' }),
-			});
-			conversations.update((list) => [conv, ...list]);
-			activeConversationId.set(conv.id);
-			messages.set([]);
-		} catch (e) {
-			console.error('Failed to create conversation:', e);
-		}
+	function newConversation() {
+		activeConversationId.set(null);
+		messages.set([]);
 	}
 
 	onMount(() => {

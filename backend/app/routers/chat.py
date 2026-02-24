@@ -50,78 +50,41 @@ async def send_message(
         .execute()
     )
 
-    # 4. Build messages list for OpenRouter (stateless — full history each turn)
-    messages = [{"role": "system", "content": SYSTEM_PROMPT}]
-    messages += [
-        {"role": m["role"], "content": m["content"]}
-        for m in messages_result.data
-    ]
-
     async def event_stream():
         full_response = []
 
-        # 5. Stream from OpenRouter (retrieval tool enabled)
+        # 4. Pre-fetch retrieval using the user message directly — runs before any LLM call.
+        #    Reduces 2 sequential LLM calls to 1 by injecting context upfront.
+        chunks = await retrieval_service.search(body.message, str(user.id))
+
+        # Notify frontend (chunk_count: 0 means no docs matched — LLM will use general knowledge)
+        yield f"data: {json.dumps({'type': 'retrieval', 'query': body.message, 'chunk_count': len(chunks)})}\n\n"
+
+        # Build context block if chunks were found
+        context_block = ""
+        if chunks:
+            context_lines = "\n\n".join(
+                f"[Chunk {c['chunk_index']} | similarity {c['similarity']:.2f}]: {c['content']}"
+                for c in chunks
+            )
+            context_block = f"\n\n<retrieved_context>\n{context_lines}\n</retrieved_context>"
+
+        # 5. Build messages list — context injected into system message
+        messages = [{"role": "system", "content": SYSTEM_PROMPT + context_block}]
+        messages += [
+            {"role": m["role"], "content": m["content"]}
+            for m in messages_result.data
+        ]
+
+        # 6. Single LLM call — no tools needed, context is already in system message
         async for event in traced_stream_chat(
             messages=messages,
             conversation_id=conversation_id,
-            use_tools=True,
+            use_tools=False,
         ):
             if event["type"] == "delta":
                 full_response.append(event["content"])
                 yield f"data: {json.dumps({'type': 'delta', 'content': event['content']})}\n\n"
-
-            elif event["type"] == "tool_calls":
-                for tc in event["tool_calls"]:
-                    if tc["name"] == "retrieve_documents":
-                        args = json.loads(tc["arguments"])
-                        query = args.get("query", "")
-
-                        # Run vector similarity search
-                        chunks = await retrieval_service.search(query, str(user.id))
-
-                        # Notify frontend that retrieval happened
-                        yield f"data: {json.dumps({'type': 'retrieval', 'query': query, 'chunk_count': len(chunks)})}\n\n"
-
-                        # Format retrieved chunks as context
-                        if chunks:
-                            context = "\n\n".join(
-                                f"[Chunk {c['chunk_index']} | similarity {c['similarity']:.2f}]: {c['content']}"
-                                for c in chunks
-                            )
-                        else:
-                            context = "No relevant documents found in the knowledge base."
-
-                        # Append assistant tool_calls turn + tool result to history
-                        messages.append({
-                            "role": "assistant",
-                            "content": None,
-                            "tool_calls": [{
-                                "id": tc["id"],
-                                "type": "function",
-                                "function": {
-                                    "name": tc["name"],
-                                    "arguments": tc["arguments"],
-                                },
-                            }],
-                        })
-                        messages.append({
-                            "role": "tool",
-                            "tool_call_id": tc["id"],
-                            "content": context,
-                        })
-
-                        # Re-stream with retrieved context (no tools — prevent infinite loops)
-                        async for event2 in traced_stream_chat(
-                            messages=messages,
-                            conversation_id=conversation_id,
-                            use_tools=False,
-                        ):
-                            if event2["type"] == "delta":
-                                full_response.append(event2["content"])
-                                yield f"data: {json.dumps({'type': 'delta', 'content': event2['content']})}\n\n"
-                            elif event2["type"] == "done":
-                                break
-
             elif event["type"] == "done":
                 break
 

@@ -2,7 +2,6 @@
 	import { isStreaming } from '$lib/stores/conversations';
 	import { Button } from '$lib/components/ui/button';
 	import { Textarea } from '$lib/components/ui/textarea';
-	import ModelSelector from './ModelSelector.svelte';
 
 	let { onsend, onstop }: { onsend: (message: string) => void; onstop: () => void } = $props();
 
@@ -27,7 +26,7 @@
 	<div class="mx-auto flex w-full max-w-3xl flex-col gap-2">
 		<div class="flex items-center gap-2">
 			<Textarea
-				placeholder="Send a message…"
+				placeholder="Query your database…"
 				bind:value={text}
 				onkeydown={handleKeydown}
 				disabled={$isStreaming}
@@ -43,9 +42,6 @@
 					Send
 				</Button>
 			{/if}
-		</div>
-		<div class="flex justify-start">
-			<ModelSelector />
 		</div>
 	</div>
 </div>

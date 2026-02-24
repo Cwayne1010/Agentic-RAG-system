@@ -42,6 +42,17 @@ RAG app with chat (default) and document ingestion interfaces. Config via env va
 ## Testing
 - Always output the full test code/commands for the user to run manually (SQL to paste into Supabase dashboard, curl commands, browser steps, etc.)
 - Do not assume tests can be run automatically — surface them explicitly so the user can execute them
+- The validation suite lives at `.agent/plans/validation/` (3 files: backend-api, ragas-eval, frontend-ux) — update it whenever new features are built:
+  - Add new test cases for every new endpoint, UI interaction, or database behaviour
+  - Add the new tests to the Pass/Fail Tracker checklist at the bottom of the relevant file
+  - Keep the Execution Order table accurate (note any prerequisites)
+
+## Markdown Formatting
+All markdown docs (plans, validation files, notes) must follow this structure:
+- `##` sections with a blank line before each
+- Test entries formatted as `### ID — Description` with fenced code block, **Pass:** and **Fail:** on separate lines
+- Every test file ends with an Execution Order table and a Pass/Fail Tracker checklist (`[x]`, `[ ]`, `[-]`)
+- Tables use standard GFM pipe syntax with header separator row
 
 ## Dev Commands
 **Restart backend:**

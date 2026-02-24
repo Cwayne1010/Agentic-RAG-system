@@ -1,5 +1,7 @@
 import asyncio
+import hashlib
 import os
+import uuid
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
 from supabase import create_client
 
@@ -28,15 +30,52 @@ async def upload_document(file: UploadFile = File(...), user=Depends(get_current
 
     text_content = content.decode("utf-8")
 
-    # Upload raw file to Supabase Storage
-    storage_path = f"{user.id}/{file.filename}"
-    supabase.storage.from_("documents").upload(
-        storage_path,
-        content,
-        {"content-type": file.content_type or "text/plain"},
-    )
+    # --- Record Manager: compute SHA-256 hash of raw file bytes ---
+    content_hash = hashlib.sha256(content).hexdigest()
 
-    # Create document record (status starts as pending)
+    # 1. Reject exact duplicate: same content already ingested successfully by this user
+    existing = (
+        supabase.table("documents")
+        .select("id, filename")
+        .eq("user_id", str(user.id))
+        .eq("content_hash", content_hash)
+        .eq("status", "completed")
+        .execute()
+    )
+    if existing.data:
+        raise HTTPException(
+            status_code=409,
+            detail=f"Duplicate: this content already exists as '{existing.data[0]['filename']}'"
+        )
+
+    # 2. Incremental update: same filename exists → delete old document + chunks (cascade via FK)
+    same_name = (
+        supabase.table("documents")
+        .select("id, file_path")
+        .eq("user_id", str(user.id))
+        .eq("filename", file.filename)
+        .execute()
+    )
+    if same_name.data:
+        old = same_name.data[0]
+        try:
+            supabase.storage.from_("documents").remove([old["file_path"]])
+        except Exception:
+            pass  # Storage file may already be gone; DB delete is what matters
+        supabase.table("documents").delete().eq("id", old["id"]).eq("user_id", str(user.id)).execute()
+
+    # Upload new file to Supabase Storage
+    storage_path = f"{user.id}/{uuid.uuid4()}/{file.filename}"
+    try:
+        supabase.storage.from_("documents").upload(
+            storage_path,
+            content,
+            {"content-type": file.content_type or "text/plain"},
+        )
+    except Exception as e:
+        raise HTTPException(400, detail=f"Storage upload failed: {e}")
+
+    # Create document record with content_hash (status starts as pending)
     result = supabase.table("documents").insert({
         "user_id": str(user.id),
         "filename": file.filename,
@@ -44,6 +83,7 @@ async def upload_document(file: UploadFile = File(...), user=Depends(get_current
         "file_size": len(content),
         "mime_type": file.content_type or "text/plain",
         "status": "pending",
+        "content_hash": content_hash,
     }).execute()
 
     document = result.data[0]

@@ -7,7 +7,6 @@
 	import { Separator } from '$lib/components/ui/separator';
 	import FileUploadZone from '$lib/components/documents/FileUploadZone.svelte';
 	import DocumentList from '$lib/components/documents/DocumentList.svelte';
-	import EmbeddingModelSelector from '$lib/components/documents/EmbeddingModelSelector.svelte';
 	import type { Document } from '../../types';
 
 	let documents = $state<Document[]>([]);
@@ -26,10 +25,19 @@
 		for (const file of files) {
 			try {
 				const doc = await uploadDocument(file);
-				documents = [doc, ...documents];
-				toast.success(`Uploaded ${file.name}`);
+				const wasUpdate = documents.some((d) => d.filename === file.name);
+				// Remove stale entry in case this was an incremental update
+				// (backend deleted the old doc, Realtime only fires on UPDATE not DELETE)
+				documents = [doc, ...documents.filter((d) => d.filename !== file.name)];
+				toast.success(wasUpdate ? `Updated ${file.name}` : `Uploaded ${file.name}`);
 			} catch (e) {
-				toast.error(`Failed to upload ${file.name}: ${(e as Error).message}`);
+				const msg = (e as Error).message;
+				if (msg.startsWith('Duplicate:')) {
+					// 409 — content already exists, show as warning not error
+					toast.warning(msg);
+				} else {
+					toast.error(`Failed to upload ${file.name}: ${msg}`);
+				}
 			}
 		}
 		uploading = false;
@@ -116,10 +124,6 @@
 				{#if uploading}
 					<p class="text-muted-foreground mt-2 text-center text-xs">Uploading…</p>
 				{/if}
-			</div>
-
-			<div class="mb-6">
-				<EmbeddingModelSelector />
 			</div>
 
 			<DocumentList {documents} ondelete={handleDelete} />

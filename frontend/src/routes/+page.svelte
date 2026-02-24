@@ -1,26 +1,43 @@
 <script lang="ts">
 	import { get } from 'svelte/store';
 	import { toast } from 'svelte-sonner';
-	import { streamChat } from '$lib/api';
+	import { streamChat, apiRequest } from '$lib/api';
 	import { supabase } from '$lib/supabase';
 	import { conversations, activeConversationId, messages, isStreaming } from '$lib/stores/conversations';
 	import ChatSidebar from '$lib/components/chat/ChatSidebar.svelte';
 	import MessageList from '$lib/components/chat/MessageList.svelte';
 	import MessageInput from '$lib/components/chat/MessageInput.svelte';
+	import SettingsModal from '$lib/components/chat/SettingsModal.svelte';
 	import { Button } from '$lib/components/ui/button';
+	import { Settings } from '@lucide/svelte';
+	import type { Conversation } from '../types';
 
 	let sidebarRef: ChatSidebar | undefined = $state();
 	let abortController: AbortController | null = null;
+	let showSettings = $state(false);
 
 	function handleStop() {
 		abortController?.abort();
 	}
 
 	async function handleSend(message: string) {
-		const conversationId = get(activeConversationId);
+		let conversationId = get(activeConversationId);
+
+		// Auto-create a conversation if none is active
 		if (!conversationId) {
-			toast.error('Please select or create a conversation first.');
-			return;
+			try {
+				const conv = await apiRequest<Conversation>('/api/conversations', {
+					method: 'POST',
+					body: JSON.stringify({ title: 'New Chat' }),
+				});
+				conversations.update((list) => [conv, ...list]);
+				activeConversationId.set(conv.id);
+				messages.set([]);
+				conversationId = conv.id;
+			} catch (e) {
+				toast.error('Failed to create conversation.');
+				return;
+			}
 		}
 
 		// 1. Optimistically add user message
@@ -104,18 +121,26 @@
 
 	<!-- Bottom bar: spans full width, aligns sidebar footer with chat input -->
 	<div class="flex shrink-0">
-		<div class="flex w-60 shrink-0 items-center border-r p-4">
+		<div class="flex w-60 shrink-0 items-center gap-2 border-r p-4">
 			<Button
 				onclick={() => supabase.auth.signOut()}
-				class="h-[44px] w-full rounded-full"
+				variant="ghost"
+				class="text-muted-foreground h-[44px] flex-1"
 			>
 				Logout
 			</Button>
+			<button onclick={() => (showSettings = true)} class="flex h-[44px] w-[44px] shrink-0 items-center justify-center rounded-full">
+				<Settings class="h-4 w-4" />
+			</button>
 		</div>
 		{#if $activeConversationId}
 			<MessageInput onsend={handleSend} onstop={handleStop} />
 		{:else}
-			<div class="flex-1" />
+			<div class="flex-1"></div>
 		{/if}
 	</div>
 </div>
+
+{#if showSettings}
+	<SettingsModal onclose={() => (showSettings = false)} />
+{/if}

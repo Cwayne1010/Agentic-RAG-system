@@ -3,18 +3,14 @@ from openai import AsyncOpenAI
 from typing import AsyncGenerator
 from app.services.settings_service import get_settings
 
-client = AsyncOpenAI(
-    api_key=os.getenv("OPENROUTER_API_KEY"),
-    base_url="https://openrouter.ai/api/v1",
-)
-
 SYSTEM_PROMPT = (
-    "You are a helpful AI assistant with access to a document retrieval tool. "
-    "When the user asks about topics that may be covered in their uploaded documents, "
-    "use the retrieve_documents tool to search first. "
-    "Always cite which documents informed your answer when you use retrieved content."
+    "You are a helpful AI assistant. When relevant document context is provided "
+    "in <retrieved_context> tags, use it to answer the user's question and cite "
+    "the source. If no context is provided, answer from your general knowledge."
 )
 
+# RETRIEVAL_TOOL is retained for future tool-calling modules (Module 7+).
+# It is not currently used — retrieval is now pre-fetched before the LLM call.
 RETRIEVAL_TOOL = {
     "type": "function",
     "function": {
@@ -37,6 +33,12 @@ RETRIEVAL_TOOL = {
 }
 
 
+def _get_llm_client(settings: dict) -> AsyncOpenAI:
+    api_key = settings.get("llm_api_key") or os.getenv("OPENROUTER_API_KEY", "")
+    base_url = settings.get("llm_base_url") or "https://openrouter.ai/api/v1"
+    return AsyncOpenAI(api_key=api_key, base_url=base_url)
+
+
 async def stream_chat(
     messages: list[dict],
     use_tools: bool = True,
@@ -47,7 +49,9 @@ async def stream_chat(
       {"type": "tool_calls", "tool_calls": list[dict]}
       {"type": "done", "content": str, "tool_calls": list[dict]}
     """
-    model = get_settings()["chat_model"]
+    settings = get_settings()
+    client = _get_llm_client(settings)
+    model = settings["chat_model"]
 
     kwargs = {
         "model": model,

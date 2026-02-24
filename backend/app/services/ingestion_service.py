@@ -1,7 +1,7 @@
 import os
 from supabase import create_client
 
-from .chunking_service import chunk_text
+from .chunking_service import chunk_text, _token_len
 from .embedding_service import embed_batch
 
 supabase = create_client(os.getenv("SUPABASE_URL"), os.getenv("SUPABASE_SERVICE_ROLE_KEY"))
@@ -30,7 +30,7 @@ async def process_document(document_id: str, user_id: str, text_content: str):
                 "chunk_index": i,
                 "content": chunk,
                 "embedding": embedding,
-                "token_count": len(chunk.split()),
+                "token_count": _token_len(chunk),
             }
             for i, (chunk, embedding) in enumerate(zip(chunks, embeddings))
         ]
