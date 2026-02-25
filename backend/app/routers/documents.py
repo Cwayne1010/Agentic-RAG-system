@@ -2,33 +2,51 @@ import asyncio
 import hashlib
 import os
 import uuid
+from pathlib import Path
+
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
 from supabase import create_client
 
 from app.dependencies import get_current_user
 from app.models.document import DocumentResponse
 from app.services.ingestion_service import process_document
+from app.services.parsing_service import parse_document
 
 router = APIRouter()
 supabase = create_client(os.getenv("SUPABASE_URL"), os.getenv("SUPABASE_SERVICE_ROLE_KEY"))
 
-ALLOWED_MIME_TYPES = {"text/plain", "text/markdown"}
+ALLOWED_MIME_TYPES = {
+    "text/plain",
+    "text/markdown",
+    "application/pdf",
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    "text/html",
+}
+ALLOWED_EXTENSIONS = {".txt", ".md", ".pdf", ".docx", ".html", ".htm"}
 MAX_FILE_SIZE = 10 * 1024 * 1024  # 10MB
 
 
 @router.post("/documents/upload", response_model=DocumentResponse)
 async def upload_document(file: UploadFile = File(...), user=Depends(get_current_user)):
-    # Allow text/plain and text/markdown; also handle .md files which browsers may label as text/plain
-    if file.content_type not in ALLOWED_MIME_TYPES and not (
-        file.filename and file.filename.endswith(".md")
-    ):
-        raise HTTPException(400, detail="Only .txt and .md files are supported")
+    ext = Path(file.filename or "").suffix.lower()
+    if file.content_type not in ALLOWED_MIME_TYPES and ext not in ALLOWED_EXTENSIONS:
+        raise HTTPException(400, detail="Unsupported file type. Accepted: PDF, DOCX, HTML, TXT, MD")
 
     content = await file.read()
     if len(content) > MAX_FILE_SIZE:
         raise HTTPException(400, detail="File too large (max 10MB)")
 
-    text_content = content.decode("utf-8")
+    # Parse bytes → text (runs in thread pool: docling is blocking/CPU-bound)
+    try:
+        text_content = await asyncio.to_thread(
+            parse_document, content, file.filename or "", file.content_type or ""
+        )
+    except ValueError as e:
+        raise HTTPException(400, detail=str(e))
+    except RuntimeError as e:
+        raise HTTPException(422, detail=str(e))
+    except Exception as e:
+        raise HTTPException(422, detail=f"Could not parse document: {e}")
 
     # --- Record Manager: compute SHA-256 hash of raw file bytes ---
     content_hash = hashlib.sha256(content).hexdigest()

@@ -251,7 +251,7 @@
 						bind:value={businessDescription}
 						placeholder="e.g. We are a logistics company managing freight forwarding, customs clearance, and last-mile delivery across Europe."
 						rows="8"
-						class="border-input bg-background placeholder:text-muted-foreground focus-visible:ring-ring w-full rounded-md border px-3 py-2 text-sm focus-visible:ring-1 focus-visible:outline-none"
+						class="border-input bg-background placeholder:text-muted-foreground focus-visible:ring-ring w-full rounded-md border px-3 py-2 text-sm text-muted-foreground focus-visible:ring-1 focus-visible:outline-none"
 					></textarea>
 					<Button
 						size="sm"

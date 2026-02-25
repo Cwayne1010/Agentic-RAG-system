@@ -82,3 +82,18 @@ Track your progress through the masterclass. Update this file as you complete mo
 - [x] Task 7: Frontend types/index.ts + DocumentList.svelte — add DocumentMetadata type, show doc_type badge + topic chips
 - [x] Task 8: Frontend api.ts + +page.svelte — onRetrieval callback, toast with chunk count and source filenames
 - [x] Task 9: Validation — M4-1 through M4-5 (backend) and M4-UX1/M4-UX2 (frontend) added to validation suite
+
+### Module 5: Multi-Format Support
+
+- [x] Task 1: Install docling (pip install docling + requirements.txt updated)
+- [x] Task 2: Create parsing_service.py (bytes → text; docling for PDF/DOCX/HTML, UTF-8 decode for TXT/MD)
+- [x] Task 3: Update documents.py router (expanded MIME types, asyncio.to_thread parse, typed error handling)
+- [x] Task 4: Update FileUploadZone.svelte (accept new types in drop filter + input, updated help text)
+- [x] Task 5: Validation — M5-1 through M5-5 (backend) and M5-UX1/M5-UX2 (frontend) added to validation suite
+
+### Module 6: Hybrid Search & Reranking
+
+- [x] Task 1: Create migration 013_hybrid_search.sql (GIN index + bm25_search_chunks RPC function)
+- [x] Task 2: Create hybrid_search_service.py (BM25 + vector search with Reciprocal Rank Fusion)
+- [x] Task 3: Update retrieval_service.py (hybrid search by default, search_mode parameter for vector/hybrid)
+- [x] Task 4: Validation — M6-1 through M6-5 (migration, RPC, hybrid search, comparison, search modes)

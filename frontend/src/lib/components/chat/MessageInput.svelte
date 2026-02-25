@@ -30,6 +30,11 @@
 
 <div class="flex-1 p-4">
 	<div class="mx-auto flex w-full max-w-3xl flex-col gap-1.5">
+		<!-- Helper text -->
+		<div class="text-center">
+			<p class="text-sm text-muted-foreground">What can I help you with?</p>
+		</div>
+
 		<div class="flex items-center gap-2">
 			<!-- Context mode trigger -->
 			<div class="relative shrink-0">
