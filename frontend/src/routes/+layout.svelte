@@ -4,22 +4,32 @@
 	import { supabase } from '$lib/supabase';
 	import { Toaster } from '$lib/components/ui/sonner';
 	import AuthForm from '$lib/components/auth/AuthForm.svelte';
+	import { conversations, activeConversationId, messages } from '$lib/stores/conversations';
 	import type { Session } from '@supabase/supabase-js';
 
 	let { children } = $props();
 
 	let session = $state<Session | null>(null);
 	let loading = $state(true);
+	let currentUserId: string | null = null;
 
 	onMount(() => {
 		supabase.auth.getSession().then(({ data }) => {
 			session = data.session;
+			currentUserId = data.session?.user.id ?? null;
 			loading = false;
 		});
 
 		const {
 			data: { subscription },
 		} = supabase.auth.onAuthStateChange((_, s) => {
+			const newUserId = s?.user.id ?? null;
+			if (newUserId !== currentUserId) {
+				conversations.set([]);
+				activeConversationId.set(null);
+				messages.set([]);
+			}
+			currentUserId = newUserId;
 			session = s;
 			loading = false;
 		});

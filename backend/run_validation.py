@@ -404,9 +404,9 @@ async def main() -> None:
 
         # S2
         r = await http.patch(
-            "/api/settings", headers=fh, json={"chat_model": "google/gemini-flash-1.5"}
+            "/api/settings", headers=fh, json={"chat_model": "google/gemini-2.0-flash"}
         )
-        if r.status_code == 200 and r.json().get("chat_model") == "google/gemini-flash-1.5":
+        if r.status_code == 200 and r.json().get("chat_model") == "google/gemini-2.0-flash":
             ok("S2", "chat model updated")
             if original_chat_model:
                 await http.patch(

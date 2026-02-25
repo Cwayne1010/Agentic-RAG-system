@@ -32,6 +32,13 @@ export async function streamChat(
 	onDone: () => void,
 	onError: (err: string) => void,
 	signal?: AbortSignal,
+	onRetrieval?: (data: {
+		chunk_count: number;
+		sources: string[];
+		mode?: string;
+		doc_count?: number;
+	}) => void,
+	fullContext?: boolean,
 ): Promise<void> {
 	let authorization: string;
 	try {
@@ -50,7 +57,7 @@ export async function streamChat(
 				Authorization: authorization,
 				Accept: 'text/event-stream',
 			},
-			body: JSON.stringify({ message }),
+			body: JSON.stringify({ message, full_context: fullContext ?? false }),
 			signal,
 		});
 	} catch (e) {
@@ -80,7 +87,14 @@ export async function streamChat(
 			for (const line of lines) {
 				if (!line.startsWith('data: ')) continue;
 				const data = JSON.parse(line.slice(6));
-				if (data.type === 'delta') {
+				if (data.type === 'retrieval') {
+					onRetrieval?.({
+					chunk_count: data.chunk_count,
+					sources: data.sources ?? [],
+					mode: data.mode,
+					doc_count: data.doc_count,
+				});
+				} else if (data.type === 'delta') {
 					onDelta(data.content);
 				} else if (data.type === 'done') {
 					onDone();
@@ -103,12 +117,13 @@ export async function uploadDocument(file: File): Promise<Document> {
 		body: formData,
 	});
 	if (!res.ok) {
+		const text = await res.text();
 		let message: string;
 		try {
-			const body = await res.json();
+			const body = JSON.parse(text);
 			message = body.detail ?? `Upload failed (${res.status})`;
 		} catch {
-			message = await res.text();
+			message = text || `Upload failed (${res.status})`;
 		}
 		throw new Error(message);
 	}
@@ -127,6 +142,14 @@ export async function deleteConversation(id: string): Promise<void> {
 	await apiRequest(`/api/conversations/${id}`, { method: 'DELETE' });
 }
 
+export interface MetadataField {
+	name: string;
+	type: 'string' | 'array' | 'date';
+	description: string;
+	allowed_values?: string[];
+	nullable?: boolean;
+}
+
 export interface AppSettings {
 	embedding_model: string;
 	chat_model: string;
@@ -136,6 +159,9 @@ export interface AppSettings {
 	embedding_base_url: string;
 	embedding_api_key: string;
 	embedding_dimensions: number;
+	business_description: string;
+	topic_vocabulary: string[];
+	metadata_schema: MetadataField[];
 }
 
 export async function getSettings(): Promise<AppSettings> {
@@ -146,6 +172,15 @@ export async function updateSettings(data: Partial<AppSettings>): Promise<AppSet
 	return apiRequest<AppSettings>('/api/settings', {
 		method: 'PATCH',
 		body: JSON.stringify(data),
+	});
+}
+
+export async function generateVocabulary(
+	business_description: string,
+): Promise<{ vocabulary: string[] }> {
+	return apiRequest('/api/settings/generate-vocabulary', {
+		method: 'POST',
+		body: JSON.stringify({ business_description }),
 	});
 }
 

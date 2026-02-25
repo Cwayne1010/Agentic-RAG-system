@@ -6,7 +6,7 @@ from app.services.settings_service import get_settings
 def _get_embedding_client(settings: dict) -> AsyncOpenAI:
     api_key = settings.get("embedding_api_key") or os.getenv("OPENROUTER_API_KEY") or os.getenv("OPENAI_API_KEY", "")
     base_url = settings.get("embedding_base_url") or "https://openrouter.ai/api/v1"
-    return AsyncOpenAI(api_key=api_key, base_url=base_url)
+    return AsyncOpenAI(api_key=api_key, base_url=base_url, timeout=30.0)
 
 
 def _supports_dimensions(model: str) -> bool:

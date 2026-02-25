@@ -6,7 +6,6 @@
 	// All route through OpenRouter — only OPENROUTER_API_KEY needed
 	const CHAT_MODELS = [
 		{ id: 'google/gemini-2.0-flash', label: 'Gemini 2.0 Flash' },
-		{ id: 'google/gemini-1.5-flash', label: 'Gemini 1.5 Flash' },
 		{ id: 'anthropic/claude-3-5-haiku', label: 'Claude 3.5 Haiku' },
 		{ id: 'anthropic/claude-3-5-sonnet', label: 'Claude 3.5 Sonnet' },
 		{ id: 'openai/gpt-4o-mini', label: 'GPT-4o Mini' },

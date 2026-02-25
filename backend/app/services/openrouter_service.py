@@ -1,3 +1,4 @@
+import json
 import os
 from openai import AsyncOpenAI
 from typing import AsyncGenerator
@@ -36,7 +37,7 @@ RETRIEVAL_TOOL = {
 def _get_llm_client(settings: dict) -> AsyncOpenAI:
     api_key = settings.get("llm_api_key") or os.getenv("OPENROUTER_API_KEY", "")
     base_url = settings.get("llm_base_url") or "https://openrouter.ai/api/v1"
-    return AsyncOpenAI(api_key=api_key, base_url=base_url)
+    return AsyncOpenAI(api_key=api_key, base_url=base_url, timeout=120.0)
 
 
 async def stream_chat(
@@ -57,7 +58,7 @@ async def stream_chat(
         "model": model,
         "messages": messages,
         "stream": True,
-        "extra_headers": {"HTTP-Referer": "http://localhost:5173"},
+        "extra_headers": {"HTTP-Referer": os.getenv("APP_URL", "http://localhost:5173")},
     }
     if use_tools:
         kwargs["tools"] = [RETRIEVAL_TOOL]
@@ -94,3 +95,18 @@ async def stream_chat(
         yield {"type": "tool_calls", "tool_calls": tool_calls}
 
     yield {"type": "done", "content": full_content, "tool_calls": tool_calls}
+
+
+async def structured_chat(messages: list[dict]) -> dict:
+    """Non-streaming call returning a JSON object (used for map phase in full context mode)."""
+    settings = get_settings()
+    client = _get_llm_client(settings)
+    model = settings["chat_model"]
+
+    response = await client.chat.completions.create(
+        model=model,
+        messages=messages,
+        response_format={"type": "json_object"},
+        extra_headers={"HTTP-Referer": os.getenv("APP_URL", "http://localhost:5173")},
+    )
+    return json.loads(response.choices[0].message.content)

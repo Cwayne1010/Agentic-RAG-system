@@ -64,6 +64,9 @@ def update_settings(
     embedding_base_url: str | None = None,
     embedding_api_key: str | None = None,
     embedding_dimensions: int | None = None,
+    business_description: str | None = None,
+    topic_vocabulary: list | None = None,
+    metadata_schema: list | None = None,
 ) -> dict:
     """Update app settings. Raises ValueError if trying to change embedding config while data exists."""
     current = get_settings()
@@ -91,6 +94,12 @@ def update_settings(
         updates["embedding_api_key"] = _encrypt(embedding_api_key)
     if embedding_dimensions is not None:
         updates["embedding_dimensions"] = embedding_dimensions
+    if business_description is not None:
+        updates["business_description"] = business_description
+    if topic_vocabulary is not None:
+        updates["topic_vocabulary"] = topic_vocabulary
+    if metadata_schema is not None:
+        updates["metadata_schema"] = metadata_schema
 
     result = supabase.table("app_settings").update(updates).eq("id", 1).execute()
     # Return decrypted keys so the response layer can mask them uniformly

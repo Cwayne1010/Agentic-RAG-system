@@ -70,3 +70,15 @@ Track your progress through the masterclass. Update this file as you complete mo
 - RPC `match_document_chunks` uses `match_user_id` param (not `p_user_id`), no `match_threshold` (hardcoded 0.3)
 - `supabase-py` `auth.sign_in_with_password()` replaces the service-role token — use REST API for tokens instead
 - 004 migration needed `SET transaction_read_only = on` removed (not supported in Supabase Postgres)
+
+### Module 4: Metadata Extraction
+
+- [ ] Task 1: Apply migration 009_document_metadata.sql (metadata JSONB column + updated RPC with JOIN + filter_doc_type)
+- [x] Task 2: Create metadata_service.py (DocumentMetadata Pydantic model + extract_metadata LLM call)
+- [x] Task 3: Update ingestion_service.py — call extract_metadata after chunks embedded, store in documents.metadata
+- [x] Task 4: Update retrieval_service.py — add doc_type_filter param, pass to RPC when set
+- [x] Task 5: Update chat.py — enrich context block with source metadata; add sources list to retrieval SSE event
+- [x] Task 6: Update models/document.py — add metadata field to DocumentResponse
+- [x] Task 7: Frontend types/index.ts + DocumentList.svelte — add DocumentMetadata type, show doc_type badge + topic chips
+- [x] Task 8: Frontend api.ts + +page.svelte — onRetrieval callback, toast with chunk count and source filenames
+- [x] Task 9: Validation — M4-1 through M4-5 (backend) and M4-UX1/M4-UX2 (frontend) added to validation suite

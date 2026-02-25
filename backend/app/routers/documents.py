@@ -33,11 +33,10 @@ async def upload_document(file: UploadFile = File(...), user=Depends(get_current
     # --- Record Manager: compute SHA-256 hash of raw file bytes ---
     content_hash = hashlib.sha256(content).hexdigest()
 
-    # 1. Reject exact duplicate: same content already ingested successfully by this user
+    # 1. Reject exact duplicate: same content already ingested anywhere in the corpus
     existing = (
         supabase.table("documents")
         .select("id, filename")
-        .eq("user_id", str(user.id))
         .eq("content_hash", content_hash)
         .eq("status", "completed")
         .execute()
@@ -99,7 +98,6 @@ async def list_documents(user=Depends(get_current_user)):
     result = (
         supabase.table("documents")
         .select("*")
-        .eq("user_id", str(user.id))
         .order("created_at", desc=True)
         .execute()
     )

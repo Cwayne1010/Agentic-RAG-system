@@ -5,12 +5,16 @@
 	import { uploadDocument, listDocuments, deleteDocument } from '$lib/api';
 	import { Button } from '$lib/components/ui/button';
 	import { Separator } from '$lib/components/ui/separator';
+	import { Settings } from '@lucide/svelte';
 	import FileUploadZone from '$lib/components/documents/FileUploadZone.svelte';
 	import DocumentList from '$lib/components/documents/DocumentList.svelte';
+	import SettingsModal from '$lib/components/chat/SettingsModal.svelte';
 	import type { Document } from '../../types';
 
 	let documents = $state<Document[]>([]);
 	let uploading = $state(false);
+	let showSettings = $state(false);
+	let currentUserId = $state('');
 
 	async function loadDocuments() {
 		try {
@@ -60,6 +64,7 @@
 
 		supabase.auth.getSession().then(({ data: { session } }) => {
 			if (!session) return;
+			currentUserId = session.user.id;
 			channel = supabase
 				.channel('documents-changes')
 				.on(
@@ -103,13 +108,20 @@
 		</div>
 		<Separator />
 		<div class="flex-1"></div>
-		<div class="p-4">
+		<div class="flex items-center gap-2 p-4">
 			<Button
 				onclick={() => supabase.auth.signOut()}
 				variant="ghost"
-				class="text-muted-foreground h-[44px] w-full"
+				class="text-muted-foreground h-[44px] flex-1"
 			>
 				Logout
+			</Button>
+			<Button
+				onclick={() => (showSettings = true)}
+				variant="ghost"
+				class="text-muted-foreground h-[44px] w-[44px] shrink-0 px-0"
+			>
+				<Settings class="h-4 w-4" />
 			</Button>
 		</div>
 	</div>
@@ -126,7 +138,11 @@
 				{/if}
 			</div>
 
-			<DocumentList {documents} ondelete={handleDelete} />
+			<DocumentList {documents} ondelete={handleDelete} {currentUserId} />
 		</div>
 	</div>
 </div>
+
+{#if showSettings}
+	<SettingsModal onclose={() => (showSettings = false)} />
+{/if}

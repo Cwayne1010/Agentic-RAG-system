@@ -15,6 +15,7 @@
 	let sidebarRef: ChatSidebar | undefined = $state();
 	let abortController: AbortController | null = null;
 	let showSettings = $state(false);
+	let fullContextMode = $state(false);
 
 	function handleStop() {
 		abortController?.abort();
@@ -90,6 +91,23 @@
 				toast.error(`Failed to send message: ${err}`);
 			},
 			abortController.signal,
+			// onRetrieval
+			({ chunk_count, sources, mode, doc_count }) => {
+				if (mode === 'full_context') {
+					toast.info(
+						`Full context: ${doc_count} doc${(doc_count ?? 0) !== 1 ? 's' : ''} evaluated`,
+						{ duration: 3000 },
+					);
+				} else {
+					if (chunk_count === 0) return;
+					const sourceList = sources.length > 0 ? ` from ${sources.join(', ')}` : '';
+					toast.info(
+						`Retrieved ${chunk_count} chunk${chunk_count !== 1 ? 's' : ''}${sourceList}`,
+						{ duration: 3000 },
+					);
+				}
+			},
+			fullContextMode,
 		);
 
 		// If aborted mid-stream, finalise the partial message
@@ -113,7 +131,7 @@
 				<MessageList />
 			{:else}
 				<div class="flex flex-1 items-center justify-center">
-					<MessageInput onsend={handleSend} onstop={handleStop} />
+					<MessageInput onsend={handleSend} onstop={handleStop} bind:fullContext={fullContextMode} />
 				</div>
 			{/if}
 		</div>
@@ -129,12 +147,16 @@
 			>
 				Logout
 			</Button>
-			<button onclick={() => (showSettings = true)} class="flex h-[44px] w-[44px] shrink-0 items-center justify-center rounded-full">
+			<Button
+				onclick={() => (showSettings = true)}
+				variant="ghost"
+				class="text-muted-foreground h-[44px] w-[44px] shrink-0 px-0"
+			>
 				<Settings class="h-4 w-4" />
-			</button>
+			</Button>
 		</div>
 		{#if $activeConversationId}
-			<MessageInput onsend={handleSend} onstop={handleStop} />
+			<MessageInput onsend={handleSend} onstop={handleStop} bind:fullContext={fullContextMode} />
 		{:else}
 			<div class="flex-1"></div>
 		{/if}

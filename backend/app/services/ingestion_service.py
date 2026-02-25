@@ -3,8 +3,11 @@ from supabase import create_client
 
 from .chunking_service import chunk_text, _token_len
 from .embedding_service import embed_batch
+from .metadata_service import extract_metadata
 
 supabase = create_client(os.getenv("SUPABASE_URL"), os.getenv("SUPABASE_SERVICE_ROLE_KEY"))
+
+_EMBED_BATCH_SIZE = 100  # Max chunks per embedding API call to avoid batch limits
 
 
 async def process_document(document_id: str, user_id: str, text_content: str):
@@ -21,7 +24,9 @@ async def process_document(document_id: str, user_id: str, text_content: str):
             }).eq("id", document_id).execute()
             return
 
-        embeddings = await embed_batch(chunks)
+        embeddings = []
+        for i in range(0, len(chunks), _EMBED_BATCH_SIZE):
+            embeddings.extend(await embed_batch(chunks[i:i + _EMBED_BATCH_SIZE]))
 
         rows = [
             {
@@ -36,9 +41,12 @@ async def process_document(document_id: str, user_id: str, text_content: str):
         ]
         supabase.table("document_chunks").insert(rows).execute()
 
+        metadata = await extract_metadata(text_content)
+
         supabase.table("documents").update({
             "status": "completed",
             "chunk_count": len(chunks),
+            "metadata": metadata,
         }).eq("id", document_id).execute()
 
     except Exception as e:

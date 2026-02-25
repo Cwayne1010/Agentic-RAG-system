@@ -5,6 +5,7 @@ from uuid import UUID
 
 class DocumentResponse(BaseModel):
     id: UUID
+    user_id: UUID
     filename: str
     file_size: int
     mime_type: str
@@ -12,5 +13,6 @@ class DocumentResponse(BaseModel):
     error_message: str | None = None
     chunk_count: int | None = None
     content_hash: str | None = None
+    metadata: dict | None = None
     created_at: datetime
     updated_at: datetime

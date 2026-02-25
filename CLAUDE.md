@@ -57,7 +57,7 @@ All markdown docs (plans, validation files, notes) must follow this structure:
 ## Dev Commands
 **Restart backend:**
 ```bash
-cd backend && source venv/bin/activate && uvicorn app.main:app --reload
+cd backend && source venv/bin/activate && uvicorn app.main:app --reload --port 8001
 ```
 
 ## Progress
