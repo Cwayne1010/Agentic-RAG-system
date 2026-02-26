@@ -27,4 +27,3 @@ class MessageResponse(BaseModel):
 
 class ChatRequest(BaseModel):
     message: str
-    full_context: bool = False

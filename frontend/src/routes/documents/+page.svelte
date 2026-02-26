@@ -2,7 +2,7 @@
 	import { onMount } from 'svelte';
 	import { toast } from 'svelte-sonner';
 	import { supabase } from '$lib/supabase';
-	import { uploadDocument, listDocuments, deleteDocument } from '$lib/api';
+	import { uploadDocument, deleteDocument } from '$lib/api';
 	import { Button } from '$lib/components/ui/button';
 	import { Separator } from '$lib/components/ui/separator';
 	import { Settings } from '@lucide/svelte';
@@ -10,19 +10,14 @@
 	import DocumentList from '$lib/components/documents/DocumentList.svelte';
 	import SettingsModal from '$lib/components/chat/SettingsModal.svelte';
 	import type { Document } from '../../types';
+	import type { PageData } from './$types';
 
-	let documents = $state<Document[]>([]);
+	let { data }: { data: PageData } = $props();
+
+	let documents = $state<Document[]>(data.documents);
 	let uploading = $state(false);
 	let showSettings = $state(false);
 	let currentUserId = $state('');
-
-	async function loadDocuments() {
-		try {
-			documents = await listDocuments();
-		} catch (e) {
-			toast.error('Failed to load documents');
-		}
-	}
 
 	async function handleUpload(files: File[]) {
 		uploading = true;
@@ -58,8 +53,6 @@
 	}
 
 	onMount(() => {
-		loadDocuments();
-
 		let channel: ReturnType<typeof supabase.channel> | null = null;
 
 		supabase.auth.getSession().then(({ data: { session } }) => {

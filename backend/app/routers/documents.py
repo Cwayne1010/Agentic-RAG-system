@@ -10,7 +10,6 @@ from supabase import create_client
 from app.dependencies import get_current_user
 from app.models.document import DocumentResponse
 from app.services.ingestion_service import process_document
-from app.services.parsing_service import parse_document
 
 router = APIRouter()
 supabase = create_client(os.getenv("SUPABASE_URL"), os.getenv("SUPABASE_SERVICE_ROLE_KEY"))
@@ -35,18 +34,6 @@ async def upload_document(file: UploadFile = File(...), user=Depends(get_current
     content = await file.read()
     if len(content) > MAX_FILE_SIZE:
         raise HTTPException(400, detail="File too large (max 10MB)")
-
-    # Parse bytes → text (runs in thread pool: docling is blocking/CPU-bound)
-    try:
-        text_content = await asyncio.to_thread(
-            parse_document, content, file.filename or "", file.content_type or ""
-        )
-    except ValueError as e:
-        raise HTTPException(400, detail=str(e))
-    except RuntimeError as e:
-        raise HTTPException(422, detail=str(e))
-    except Exception as e:
-        raise HTTPException(422, detail=f"Could not parse document: {e}")
 
     # --- Record Manager: compute SHA-256 hash of raw file bytes ---
     content_hash = hashlib.sha256(content).hexdigest()
@@ -99,14 +86,16 @@ async def upload_document(file: UploadFile = File(...), user=Depends(get_current
         "file_path": storage_path,
         "file_size": len(content),
         "mime_type": file.content_type or "text/plain",
-        "status": "pending",
+        "status": "parsing",
         "content_hash": content_hash,
     }).execute()
 
     document = result.data[0]
 
-    # Kick off background ingestion (chunk → embed → store)
-    asyncio.create_task(process_document(document["id"], str(user.id), text_content))
+    # Kick off background ingestion (parse → chunk → embed → store)
+    asyncio.create_task(
+        process_document(document["id"], str(user.id), content, file.filename or "", file.content_type or "")
+    )
 
     return document
 

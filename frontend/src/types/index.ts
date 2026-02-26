@@ -28,9 +28,11 @@ export interface Document {
 	filename: string;
 	file_size: number;
 	mime_type: string;
-	status: 'pending' | 'processing' | 'completed' | 'failed';
+	status: 'pending' | 'parsing' | 'processing' | 'completed' | 'failed';
 	error_message?: string;
 	chunk_count?: number;
+	chunks_total?: number;
+	chunks_processed?: number;
 	metadata?: DocumentMetadata;
 	created_at: string;
 	updated_at: string;

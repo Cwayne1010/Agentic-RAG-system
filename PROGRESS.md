@@ -97,3 +97,27 @@ Track your progress through the masterclass. Update this file as you complete mo
 - [x] Task 2: Create hybrid_search_service.py (BM25 + vector search with Reciprocal Rank Fusion)
 - [x] Task 3: Update retrieval_service.py (hybrid search by default, search_mode parameter for vector/hybrid)
 - [x] Task 4: Validation — M6-1 through M6-5 (migration, RPC, hybrid search, comparison, search modes)
+
+### Module 7: Additional Tools
+
+- [x] Task 1: Install duckduckgo-search + update requirements.txt
+- [ ] Task 2: Apply migration 015_text_to_sql_rpc.sql (execute_user_sql RPC) — manual step in Supabase SQL editor
+- [x] Task 3: Create web_search_service.py (DuckDuckGo async wrapper)
+- [x] Task 4: Create text_to_sql_service.py (NL → SQL → Supabase)
+- [x] Task 5: Create tool_executor.py (dispatch layer)
+- [x] Task 6: Update openrouter_service.py (3 tool definitions, new SYSTEM_PROMPT, ALL_TOOLS)
+- [x] Task 7: Update chat.py (tool-calling loop, remove pre-fetch)
+- [x] Task 8: Update api.ts + +page.svelte (tool_call/tool_result events, pill display)
+- [ ] Task 9: Validation — M7-1 through M7-7 (backend) and M7-UX1/UX2/UX3 (frontend)
+
+### Module 8: Sub-Agents (Option B) — with full-context retirement
+
+- [x] Removals: _full_context_events, DocumentMapResult, full_context toggle, fullContextMode
+- [x] Task 1: Update retrieval_service.py (user_id on fetch_all_chunks, find_document_id_by_filename, fetch_document_context)
+- [x] Task 2: Create document_agent_service.py (Path A: single doc; Path B: all docs map-reduce)
+- [x] Task 3: Add DOCUMENT_AGENT_TOOL to openrouter_service.py; update ALL_TOOLS + SYSTEM_PROMPT
+- [x] Task 4: Update chat.py — remove full_context branch, special-case spawn_document_agent
+- [x] Task 5: Update api.ts — remove fullContext param, add 5 sub-agent SSE callbacks
+- [x] Task 6: Update MessageInput.svelte — remove full-context toggle UI
+- [x] Task 7: Update +page.svelte — remove fullContextMode, nested pill state + rendering
+- [x] Task 8: Validation — M8-1–M8-5 (backend) and M8-UX1–M8-UX4 (frontend)

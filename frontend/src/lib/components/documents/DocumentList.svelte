@@ -29,6 +29,10 @@
 			label: 'Pending',
 			classes: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400',
 		},
+		parsing: {
+			label: 'Parsing',
+			classes: 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400',
+		},
 		processing: {
 			label: 'Processing',
 			classes: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400',
@@ -79,7 +83,11 @@
 						</div>
 						<div class="text-muted-foreground flex gap-3 text-xs">
 							<span>{formatSize(doc.file_size)}</span>
-							{#if doc.chunk_count}
+							{#if doc.status === 'parsing'}
+								<span>Reading document…</span>
+							{:else if doc.status === 'processing' && doc.chunks_total}
+								<span>Embedding {doc.chunks_processed ?? 0} / {doc.chunks_total} chunks</span>
+							{:else if doc.chunk_count}
 								<span>{doc.chunk_count} chunks</span>
 							{/if}
 							<span>{formatDate(doc.created_at)}</span>
@@ -107,10 +115,6 @@
 				{#if doc.metadata && expanded}
 					<div class="border-t px-4 pb-4 pt-3">
 						<dl class="space-y-3 text-xs">
-							<div class="flex gap-3">
-								<dt class="text-muted-foreground/60 w-20 shrink-0">Title</dt>
-								<dd class="text-muted-foreground">{doc.filename}</dd>
-							</div>
 							<div class="flex gap-3">
 								<dt class="text-muted-foreground/60 w-20 shrink-0">Summary</dt>
 								<dd class="text-muted-foreground leading-relaxed">{doc.metadata.summary}</dd>

@@ -38,7 +38,13 @@ export async function streamChat(
 		mode?: string;
 		doc_count?: number;
 	}) => void,
-	fullContext?: boolean,
+	onToolCall?: (data: { tool_name: string; args: object }) => void,
+	onToolResult?: (data: { tool_name: string; [key: string]: unknown }) => void,
+	onSubAgentStart?: (data: { task: string; document_name: string | null }) => void,
+	onSubAgentToolCall?: (data: { tool_name: string; args: object }) => void,
+	onSubAgentToolResult?: (data: { tool_name: string; chunk_count: number; sources: string[] }) => void,
+	onSubAgentDelta?: (data: { content: string }) => void,
+	onSubAgentDone?: (data: { answer: string }) => void,
 ): Promise<void> {
 	let authorization: string;
 	try {
@@ -57,7 +63,7 @@ export async function streamChat(
 				Authorization: authorization,
 				Accept: 'text/event-stream',
 			},
-			body: JSON.stringify({ message, full_context: fullContext ?? false }),
+			body: JSON.stringify({ message }),
 			signal,
 		});
 	} catch (e) {
@@ -89,11 +95,29 @@ export async function streamChat(
 				const data = JSON.parse(line.slice(6));
 				if (data.type === 'retrieval') {
 					onRetrieval?.({
-					chunk_count: data.chunk_count,
-					sources: data.sources ?? [],
-					mode: data.mode,
-					doc_count: data.doc_count,
-				});
+						chunk_count: data.chunk_count,
+						sources: data.sources ?? [],
+						mode: data.mode,
+						doc_count: data.doc_count,
+					});
+				} else if (data.type === 'tool_call') {
+					onToolCall?.(data);
+				} else if (data.type === 'tool_result') {
+					onToolResult?.(data);
+				} else if (data.type === 'sub_agent_start') {
+					onSubAgentStart?.(data);
+				} else if (data.type === 'sub_agent_scanning') {
+					// no-op or forward to a callback — handled by parent pill spinner
+				} else if (data.type === 'sub_agent_map_done') {
+					onSubAgentDone?.({ answer: `Scanned ${data.total_docs} docs, ${data.relevant_docs} relevant` });
+				} else if (data.type === 'sub_agent_tool_call') {
+					onSubAgentToolCall?.(data);
+				} else if (data.type === 'sub_agent_tool_result') {
+					onSubAgentToolResult?.(data);
+				} else if (data.type === 'sub_agent_delta') {
+					onSubAgentDelta?.(data);
+				} else if (data.type === 'sub_agent_done') {
+					onSubAgentDone?.(data);
 				} else if (data.type === 'delta') {
 					onDelta(data.content);
 				} else if (data.type === 'done') {

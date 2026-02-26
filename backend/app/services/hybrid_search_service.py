@@ -11,7 +11,8 @@ async def hybrid_search(
     query: str,
     top_k: int = 5,
     doc_type_filter: str | None = None,
-    alpha: float = 0.5
+    alpha: float = 0.5,
+    user_id: str | None = None,
 ) -> List[Dict]:
     """
     Hybrid search combining BM25 keyword search and vector similarity search.
@@ -23,6 +24,7 @@ async def hybrid_search(
         top_k: Number of final results to return
         doc_type_filter: Optional document type filter
         alpha: Weight for combining scores (0.0 = all BM25, 1.0 = all vector)
+        user_id: User ID for scoping results
 
     Returns:
         List of chunks ranked by hybrid score with metadata
@@ -31,8 +33,8 @@ async def hybrid_search(
     candidate_count = top_k * 4
 
     # Run BM25 and vector searches in parallel
-    bm25_results = await _bm25_search(query, candidate_count, doc_type_filter)
-    vector_results = await _vector_search(query, candidate_count, doc_type_filter)
+    bm25_results = await _bm25_search(query, candidate_count, doc_type_filter, user_id)
+    vector_results = await _vector_search(query, candidate_count, doc_type_filter, user_id)
 
     # Combine results using RRF
     fused_results = _reciprocal_rank_fusion(
@@ -45,7 +47,7 @@ async def hybrid_search(
     return diverse_results
 
 
-async def _bm25_search(query: str, top_k: int, doc_type_filter: str | None = None) -> List[Dict]:
+async def _bm25_search(query: str, top_k: int, doc_type_filter: str | None = None, user_id: str | None = None) -> List[Dict]:
     """BM25 full-text search using PostgreSQL's built-in capabilities."""
     params = {
         "query_text": query,
@@ -66,7 +68,7 @@ async def _bm25_search(query: str, top_k: int, doc_type_filter: str | None = Non
     return chunks
 
 
-async def _vector_search(query: str, top_k: int, doc_type_filter: str | None = None) -> List[Dict]:
+async def _vector_search(query: str, top_k: int, doc_type_filter: str | None = None, user_id: str | None = None) -> List[Dict]:
     """Vector similarity search using existing pgvector infrastructure."""
     query_embedding = await embed_text(query)
 
@@ -187,22 +189,25 @@ def _apply_document_diversity(chunks: List[Dict], top_k: int) -> List[Dict]:
 async def vector_only_search(
     query: str,
     top_k: int = 5,
-    doc_type_filter: str | None = None
+    doc_type_filter: str | None = None,
+    user_id: str | None = None,
 ) -> List[Dict]:
     """
     Vector-only search for comparison and fallback.
 
     Maintains compatibility with existing retrieval_service interface.
     """
-    return await _vector_search(query, top_k * 4, doc_type_filter)[:top_k]
+    results = await _vector_search(query, top_k * 4, doc_type_filter, user_id)
+    return results[:top_k]
 
 
 async def bm25_only_search(
     query: str,
     top_k: int = 5,
-    doc_type_filter: str | None = None
+    doc_type_filter: str | None = None,
+    user_id: str | None = None,
 ) -> List[Dict]:
     """
     BM25-only search for comparison and debugging.
     """
-    return await _bm25_search(query, top_k, doc_type_filter)
+    return await _bm25_search(query, top_k, doc_type_filter, user_id)
