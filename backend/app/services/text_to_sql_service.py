@@ -7,21 +7,26 @@ from app.services.settings_service import get_settings
 
 supabase = create_client(os.getenv("SUPABASE_URL"), os.getenv("SUPABASE_SERVICE_ROLE_KEY"))
 
-# Schema exposed to the LLM — ONLY order_history is accessible.
-# The execute_user_sql RPC runs as text_to_sql_reader which has SELECT-only
-# on this table; all other tables are inaccessible at the database level.
+# Schema exposed to the LLM — only tables the user owns data in
 _SCHEMA = """
-Table: order_history
-  id            uuid
-  user_id       uuid        (always filter with user_id = '<user_id>')
-  order_number  text        (e.g. 'ORD-10001')
-  order_date    timestamptz
-  status        text        ('pending'|'processing'|'shipped'|'delivered'|'cancelled')
-  total_amount  numeric     (monetary value)
-  currency      text        (e.g. 'USD')
-  item_count    integer     (number of line items)
-  items         jsonb       (array of {name text, qty integer, unit_price numeric})
-  created_at    timestamptz
+Tables (all have a user_id column for data isolation):
+
+documents
+  id uuid, user_id uuid, filename text, file_size integer (bytes),
+  mime_type text, status text ('pending'|'processing'|'completed'|'failed'),
+  created_at timestamptz,
+  metadata jsonb (keys: doc_type, topics, language, summary),
+  chunk_count integer
+
+document_chunks
+  id uuid, document_id uuid, user_id uuid, chunk_index integer, content text
+
+conversations
+  id uuid, user_id uuid, title text, created_at timestamptz, updated_at timestamptz
+
+messages
+  id uuid, conversation_id uuid, user_id uuid,
+  role text ('user'|'assistant'), content text, created_at timestamptz
 """
 
 

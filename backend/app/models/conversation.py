@@ -23,6 +23,7 @@ class MessageResponse(BaseModel):
     role: str
     content: str
     created_at: datetime
+    metadata: dict | None = None
 
 
 class ChatRequest(BaseModel):

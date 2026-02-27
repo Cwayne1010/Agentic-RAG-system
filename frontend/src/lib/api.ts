@@ -34,7 +34,7 @@ export async function streamChat(
 	signal?: AbortSignal,
 	onRetrieval?: (data: {
 		chunk_count: number;
-		sources: string[];
+		sources: { name: string; chunks: number }[];
 		mode?: string;
 		doc_count?: number;
 	}) => void,
@@ -42,7 +42,7 @@ export async function streamChat(
 	onToolResult?: (data: { tool_name: string; [key: string]: unknown }) => void,
 	onSubAgentStart?: (data: { task: string; document_name: string | null }) => void,
 	onSubAgentToolCall?: (data: { tool_name: string; args: object }) => void,
-	onSubAgentToolResult?: (data: { tool_name: string; chunk_count: number; sources: string[] }) => void,
+	onSubAgentToolResult?: (data: { tool_name: string; chunk_count: number; sources: { name: string; chunks: number }[] }) => void,
 	onSubAgentDelta?: (data: { content: string }) => void,
 	onSubAgentDone?: (data: { answer: string }) => void,
 ): Promise<void> {
@@ -80,6 +80,7 @@ export async function streamChat(
 	const reader = response.body!.getReader();
 	const decoder = new TextDecoder();
 	let buffer = '';
+	let streamDone = false;
 
 	try {
 		while (true) {
@@ -109,7 +110,7 @@ export async function streamChat(
 				} else if (data.type === 'sub_agent_scanning') {
 					// no-op or forward to a callback — handled by parent pill spinner
 				} else if (data.type === 'sub_agent_map_done') {
-					onSubAgentDone?.({ answer: `Scanned ${data.total_docs} docs, ${data.relevant_docs} relevant` });
+					// scanning progress event — actual answer comes via sub_agent_done
 				} else if (data.type === 'sub_agent_tool_call') {
 					onSubAgentToolCall?.(data);
 				} else if (data.type === 'sub_agent_tool_result') {
@@ -121,6 +122,7 @@ export async function streamChat(
 				} else if (data.type === 'delta') {
 					onDelta(data.content);
 				} else if (data.type === 'done') {
+					streamDone = true;
 					onDone();
 				}
 			}
@@ -128,6 +130,13 @@ export async function streamChat(
 	} catch (e) {
 		if ((e as Error).name === 'AbortError') return;
 		onError(String(e));
+		return;
+	}
+
+	// Stream ended without an explicit done event (proxy timeout, network drop, etc.)
+	// Finalize the UI so it doesn't hang in streaming state indefinitely.
+	if (!streamDone) {
+		onDone();
 	}
 }
 
@@ -177,6 +186,7 @@ export interface MetadataField {
 export interface AppSettings {
 	embedding_model: string;
 	chat_model: string;
+	map_model: string;
 	embedding_locked: boolean;
 	llm_base_url: string;
 	llm_api_key: string;

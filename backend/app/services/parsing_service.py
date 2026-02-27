@@ -42,9 +42,14 @@ def parse_document(content: bytes, filename: str, mime_type: str) -> str:
                 "Document parsed but produced no text. "
                 "If this is a scanned PDF, it may be image-only and not supported."
             )
-        return text
+        return _sanitize(text)
 
     raise ValueError(f"Unsupported file type: mime={mime_type!r}, filename={filename!r}")
+
+
+def _sanitize(text: str) -> str:
+    """Remove null bytes and other characters PostgreSQL can't store as text."""
+    return text.replace("\x00", "")
 
 
 def _parse_with_docling(content: bytes, ext: str) -> str:

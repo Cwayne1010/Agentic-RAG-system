@@ -16,6 +16,7 @@
 
 	// LLM fields
 	let chatModel = $state('');
+	let mapModel = $state('');
 	let llmBaseUrl = $state('');
 	let llmApiKey = $state('');
 	let llmApiKeySet = $state(false);
@@ -41,6 +42,7 @@
 		try {
 			settings = await getSettings();
 			chatModel = settings.chat_model;
+			mapModel = settings.map_model;
 			llmBaseUrl = settings.llm_base_url;
 			llmApiKeySet = settings.llm_api_key === REDACTED;
 			llmApiKey = '';
@@ -104,6 +106,7 @@
 		try {
 			const payload: Parameters<typeof updateSettings>[0] = {
 				chat_model: chatModel,
+				map_model: mapModel,
 				llm_base_url: llmBaseUrl,
 				embedding_model: embeddingModel,
 				embedding_base_url: embeddingBaseUrl,
@@ -178,6 +181,10 @@
 						<div>
 							<label class="mb-1 block text-xs text-muted-foreground">Model</label>
 							<Input bind:value={chatModel} placeholder="e.g. google/gemini-2.0-flash" class="h-8 text-sm" />
+						</div>
+						<div>
+							<label class="mb-1 block text-xs text-muted-foreground">Map Model <span class="font-normal normal-case">(bulk doc analysis)</span></label>
+							<Input bind:value={mapModel} placeholder="e.g. google/gemini-1.5-flash" class="h-8 text-sm" />
 						</div>
 						<div>
 							<label class="mb-1 block text-xs text-muted-foreground">Base URL</label>

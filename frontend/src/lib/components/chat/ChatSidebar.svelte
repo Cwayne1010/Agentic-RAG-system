@@ -19,8 +19,21 @@
 	async function selectConversation(id: string) {
 		activeConversationId.set(id);
 		try {
-			const data = await apiRequest<Message[]>(`/api/conversations/${id}/messages`);
-			messages.set(data);
+			const data = await apiRequest<(Message & { metadata?: { tool_calls?: unknown[]; tool_call_offset?: number } })[]>(
+				`/api/conversations/${id}/messages`
+			);
+			messages.set(
+				data.map((m) => ({
+					...m,
+					id: String(m.id),
+					...(m.metadata?.tool_calls?.length
+						? {
+								toolCalls: m.metadata.tool_calls as Message['toolCalls'],
+								toolCallOffset: m.metadata.tool_call_offset ?? 0,
+							}
+						: {}),
+				}))
+			);
 		} catch (e) {
 			console.error('Failed to load messages:', e);
 		}

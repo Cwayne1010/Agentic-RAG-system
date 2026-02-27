@@ -5,12 +5,22 @@ export interface Conversation {
 	updated_at: string;
 }
 
+export interface ToolCall {
+	tool_name: string;
+	args: object;
+	status: 'running' | 'done';
+	result?: object;
+	children?: ToolCall[];
+}
+
 export interface Message {
 	id: string;
 	role: 'user' | 'assistant';
 	content: string;
 	created_at: string;
 	streaming?: boolean; // ephemeral — true while assistant response is being streamed
+	toolCalls?: ToolCall[]; // persisted after streaming ends
+	toolCallOffset?: number; // content length when first tool call fired — splits pre/post text
 }
 
 export interface DocumentMetadata {

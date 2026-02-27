@@ -20,6 +20,7 @@ from app.services import retrieval_service
 from app.services.openrouter_service import structured_chat
 
 MAX_SUB_AGENT_ITERATIONS = 2
+DIRECT_INJECT_THRESHOLD = 25  # skip map-reduce below this total chunk count
 
 SUB_AGENT_SYSTEM_PROMPT = (
     "You are a document analysis specialist. Your job is to analyse documents "
@@ -45,7 +46,7 @@ RETRIEVAL_TOOL_ONLY = {
 }
 
 
-async def _analyze_doc(doc_id: str, chunks: list[dict], task: str) -> dict | None:
+async def _analyze_doc(doc_id: str, chunks: list[dict], task: str, model: str | None = None) -> dict | None:
     """
     Map phase: extract key_points and relevance for one document.
     Mirrors the old map_doc() logic from chat.py.
@@ -69,7 +70,7 @@ async def _analyze_doc(doc_id: str, chunks: list[dict], task: str) -> dict | Non
                 "role": "user",
                 "content": f"Task: {task}\n\nDocument: {doc_filename}\n\nChunks:\n{chunks_text}",
             },
-        ])
+        ], model_override=model)
         result["doc_id"] = doc_id
         return result
     except Exception:
@@ -87,7 +88,12 @@ async def run_agent(
     api_key = settings.get("llm_api_key") or os.getenv("OPENROUTER_API_KEY", "")
     base_url = settings.get("llm_base_url") or "https://openrouter.ai/api/v1"
     model = settings["chat_model"]
+    map_model = settings.get("map_model") or model
     client = AsyncOpenAI(api_key=api_key, base_url=base_url, timeout=120.0)
+
+    # sub_agent_model: model used for the final streaming response
+    # Path A uses chat_model; Path B uses map_model (fast large-context model)
+    sub_agent_model = model
 
     # ── Path A: single named document ──────────────────────────────────────
     if document_name:
@@ -115,58 +121,97 @@ async def run_agent(
             use_tools = True
             tools_list = [RETRIEVAL_TOOL_ONLY]
 
-    # ── Path B: all documents (replaces full-context map-reduce) ───────────
+    # ── Path B: all documents ───────────────────────────────────────────────
     else:
         chunks_by_doc = await retrieval_service.fetch_all_chunks_by_document(user_id)
         doc_count = len(chunks_by_doc)
+        total_chunks = sum(len(c) for c in chunks_by_doc.values())
 
         yield {"type": "sub_agent_scanning", "doc_count": doc_count}
 
-        # Map phase: analyze all docs in parallel
-        map_tasks = [
-            _analyze_doc(doc_id, chunks, task)
-            for doc_id, chunks in chunks_by_doc.items()
-        ]
-        map_results = await asyncio.gather(*map_tasks)
+        sub_agent_model = map_model  # Path B always uses the fast model
 
-        valid = [r for r in map_results if r is not None]
-        relevant = [r for r in valid if r.get("relevant")] or valid  # fall back to all if none marked relevant
+        if total_chunks <= DIRECT_INJECT_THRESHOLD:
+            # ── Path B-fast: inject all chunks directly, single LLM call ──
+            parts = []
+            for doc_id, chunks in chunks_by_doc.items():
+                doc_filename = chunks[0].get("doc_filename", doc_id) if chunks else doc_id
+                sorted_chunks = sorted(chunks, key=lambda x: x.get("chunk_index", 0))
+                chunks_text = "\n\n".join(
+                    f"[Chunk {c.get('chunk_index', i)}]\n{c['content']}"
+                    for i, c in enumerate(sorted_chunks)
+                )
+                parts.append(f'<document name="{doc_filename}">\n{chunks_text}\n</document>')
 
-        # Stream a progress event so the frontend knows how many docs were analyzed
-        yield {
-            "type": "sub_agent_map_done",
-            "total_docs": doc_count,
-            "relevant_docs": len(relevant),
-            "sources": [r.get("document_name", "") for r in relevant],
-        }
+            yield {
+                "type": "sub_agent_map_done",
+                "total_docs": doc_count,
+                "relevant_docs": doc_count,
+                "sources": [
+                    chunks[0].get("doc_filename", doc_id)
+                    for doc_id, chunks in chunks_by_doc.items() if chunks
+                ],
+            }
 
-        map_summary = "\n\n".join(
-            "Document: {}\nKey Points:\n{}".format(
-                r.get("document_name", "unknown"),
-                "\n".join(f"- {p}" for p in r.get("key_points", [])),
+            system = (
+                SUB_AGENT_SYSTEM_PROMPT
+                + "\n\n<knowledge_base>\n"
+                + "\n\n".join(parts)
+                + "\n</knowledge_base>\n\n"
+                "The full knowledge base is injected above. Answer the task using it directly."
             )
-            for r in relevant
-        )
+            messages = [
+                {"role": "system", "content": system},
+                {"role": "user", "content": f"Task: {task}"},
+            ]
+            use_tools = False
+            tools_list = []
 
-        system = (
-            SUB_AGENT_SYSTEM_PROMPT
-            + f"\n\n<corpus_analysis>\n{map_summary}\n</corpus_analysis>\n\n"
-            "The above is an analysis of all relevant documents in the user's knowledge base. "
-            "Answer the task using this analysis."
-        )
-        messages = [
-            {"role": "system", "content": system},
-            {"role": "user", "content": f"Task: {task}"},
-        ]
-        use_tools = False
-        tools_list = []
+        else:
+            # ── Path B-slow: map-reduce with fast map_model ────────────────
+            map_tasks = [
+                _analyze_doc(doc_id, chunks, task, model=map_model)
+                for doc_id, chunks in chunks_by_doc.items()
+            ]
+            map_results = await asyncio.gather(*map_tasks)
+
+            valid = [r for r in map_results if r is not None]
+            relevant = [r for r in valid if r.get("relevant")] or valid
+
+            yield {
+                "type": "sub_agent_map_done",
+                "total_docs": doc_count,
+                "relevant_docs": len(relevant),
+                "sources": [r.get("document_name", "") for r in relevant],
+            }
+
+            map_summary = "\n\n".join(
+                "Document: {}\nKey Points:\n{}".format(
+                    r.get("document_name", "unknown"),
+                    "\n".join(f"- {p}" for p in r.get("key_points", [])),
+                )
+                for r in relevant
+            )
+
+            system = (
+                SUB_AGENT_SYSTEM_PROMPT
+                + f"\n\n<corpus_analysis>\n{map_summary}\n</corpus_analysis>\n\n"
+                "The above is an analysis of all relevant documents in the user's knowledge base. "
+                "Answer the task using this analysis."
+            )
+            messages = [
+                {"role": "system", "content": system},
+                {"role": "user", "content": f"Task: {task}"},
+            ]
+            use_tools = False
+            tools_list = []
 
     # ── Streaming LLM response (both paths converge here) ──────────────────
     final_answer = ""
 
     for _iteration in range(MAX_SUB_AGENT_ITERATIONS):
         kwargs: dict = {
-            "model": model,
+            "model": sub_agent_model,
             "messages": messages,
             "stream": True,
             "extra_headers": {"HTTP-Referer": os.getenv("APP_URL", "http://localhost:5173")},
@@ -226,7 +271,13 @@ async def run_agent(
                     chunks = await retrieval_service.search(
                         query, top_k=8, doc_type_filter=doc_type, user_id=user_id
                     )
-                    sources = list({c["doc_filename"] for c in chunks}) if chunks else []
+                    if chunks:
+                        _sc: dict[str, int] = {}
+                        for c in chunks:
+                            _sc[c["doc_filename"]] = _sc.get(c["doc_filename"], 0) + 1
+                        sources = [{"name": n, "chunks": cnt} for n, cnt in _sc.items()]
+                    else:
+                        sources = []
                     context_text = (
                         "\n\n".join(
                             "[Source: {fn} | Chunk {idx} | score {sim:.2f}]: {content}".format(

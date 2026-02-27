@@ -1,7 +1,6 @@
 <script lang="ts">
 	import { get } from 'svelte/store';
-	import { fade } from 'svelte/transition';
-	import { toast } from 'svelte-sonner';
+import { toast } from 'svelte-sonner';
 	import { streamChat, apiRequest } from '$lib/api';
 	import { supabase } from '$lib/supabase';
 	import { conversations, activeConversationId, messages, isStreaming } from '$lib/stores/conversations';
@@ -81,15 +80,19 @@
 					list.map((m) => (m.id === assistantId ? { ...m, content: m.content + text } : m)),
 				);
 			},
-			// onDone
+			// onDone — save tool calls and offset into the message before clearing
 			() => {
+				const savedToolCalls = currentToolCalls.length > 0 ? [...currentToolCalls] : undefined;
 				messages.update((list) =>
-					list.map((m) => (m.id === assistantId ? { ...m, streaming: false } : m)),
+					list.map((m) =>
+						m.id === assistantId
+							? { ...m, streaming: false, ...(savedToolCalls ? { toolCalls: savedToolCalls } : {}) }
+							: m
+					),
 				);
 				isStreaming.set(false);
 				abortController = null;
 				currentToolCalls = [];
-				// Refresh sidebar to pick up any title update
 				sidebarRef?.refresh();
 			},
 			// onError
@@ -104,31 +107,35 @@
 			// onRetrieval
 			({ chunk_count, sources }) => {
 				if (chunk_count === 0) return;
-				const sourceList = sources.length > 0 ? ` from ${sources.join(', ')}` : '';
+				const sourceList = sources.length > 0 ? ` from ${sources.map(s => s.name).join(', ')}` : '';
 				toast.info(`Retrieved ${chunk_count} chunk${chunk_count !== 1 ? 's' : ''}${sourceList}`, { duration: 3000 });
 			},
-			// onToolCall (add children: [])
+			// onToolCall — snapshot content length on first call so display stays in place
 			(data) => {
+				if (currentToolCalls.length === 0) {
+					messages.update((list) =>
+						list.map((m) =>
+							m.id === assistantId && m.toolCallOffset === undefined
+								? { ...m, toolCallOffset: m.content.length }
+								: m
+						)
+					);
+				}
 				currentToolCalls = [...currentToolCalls, {
 					tool_name: data.tool_name, args: data.args, status: 'running', children: []
 				}];
 			},
-			// onToolResult (unchanged)
+			// onToolResult — mark done, no auto-removal
 			(data) => {
 				currentToolCalls = currentToolCalls.map((tc) =>
 					tc.tool_name === data.tool_name && tc.status === 'running'
 						? { ...tc, status: 'done', result: data as object }
 						: tc
 				);
-				setTimeout(() => {
-					currentToolCalls = currentToolCalls.filter(
-						(tc) => !(tc.tool_name === data.tool_name && tc.status === 'done')
-					);
-				}, 1500);
 			},
 			// onSubAgentStart
 			(_data) => {},
-			// onSubAgentToolCall — push child pill
+			// onSubAgentToolCall — push child
 			(data) => {
 				currentToolCalls = currentToolCalls.map((tc) =>
 					tc.tool_name === 'spawn_document_agent' && tc.status === 'running'
@@ -150,20 +157,19 @@
 					};
 				});
 			},
-			// onSubAgentDelta — no-op (parent pill spinner covers this)
-			(_data) => {},
-			// onSubAgentDone — mark parent done, remove after 2s
+			// onSubAgentDelta
+			(data) => {
+				messages.update((list) =>
+					list.map((m) => (m.id === assistantId ? { ...m, content: m.content + data.content } : m)),
+				);
+			},
+			// onSubAgentDone — mark parent done, no auto-removal
 			(data) => {
 				currentToolCalls = currentToolCalls.map((tc) =>
 					tc.tool_name === 'spawn_document_agent' && tc.status === 'running'
 						? { ...tc, status: 'done', result: { answer: data.answer } as object }
 						: tc
 				);
-				setTimeout(() => {
-					currentToolCalls = currentToolCalls.filter(
-						(tc) => !(tc.tool_name === 'spawn_document_agent' && tc.status === 'done')
-					);
-				}, 2000);
 			},
 		);
 
@@ -183,9 +189,9 @@
 	<div class="flex min-h-0 flex-1 overflow-hidden">
 		<ChatSidebar bind:this={sidebarRef} />
 
-		<div class="relative flex flex-1 flex-col overflow-hidden">
+		<div class="flex flex-1 flex-col overflow-hidden">
 			{#if $activeConversationId}
-				<MessageList />
+				<MessageList toolCalls={currentToolCalls} />
 			{:else}
 				<div class="flex flex-1 items-center justify-center">
 					<MessageInput onsend={handleSend} onstop={handleStop} />
@@ -219,48 +225,6 @@
 		{/if}
 	</div>
 </div>
-
-{#if currentToolCalls.length > 0}
-	<div class="fixed right-4 bottom-12 flex flex-col items-end gap-1">
-		{#each currentToolCalls as tc (tc.tool_name)}
-			<div transition:fade={{ duration: 150 }} class="flex flex-col items-end gap-0.5">
-				<span class="inline-flex items-center gap-1.5 rounded-full border bg-background px-2.5 py-1 text-xs shadow-sm">
-					{#if tc.status === 'running'}
-						<span class="animate-spin inline-block text-muted-foreground">⟳</span>
-					{:else}
-						<span class="text-green-500">✓</span>
-					{/if}
-					<span class="text-muted-foreground">
-						{tc.tool_name === 'retrieve_documents' ? 'Searching docs' :
-						 tc.tool_name === 'web_search' ? 'Web search' :
-						 tc.tool_name === 'query_database' ? 'Querying DB' :
-						 tc.tool_name === 'spawn_document_agent' ? 'Document agent' : tc.tool_name}
-						{#if (tc.result as {chunk_count?: number})?.chunk_count !== undefined} · {(tc.result as {chunk_count: number}).chunk_count} chunks{/if}
-						{#if (tc.result as {row_count?: number})?.row_count !== undefined} · {(tc.result as {row_count: number}).row_count} rows{/if}
-						{#if (tc.result as {result_count?: number})?.result_count !== undefined} · {(tc.result as {result_count: number}).result_count} results{/if}
-					</span>
-				</span>
-				{#if tc.children && tc.children.length > 0}
-					<div class="flex flex-col items-end gap-0.5 pr-3 border-r border-muted-foreground/20">
-						{#each tc.children as child, i (child.tool_name + i)}
-							<span class="inline-flex items-center gap-1 rounded-full border bg-muted px-2 py-0.5 text-[10px] shadow-sm opacity-80">
-								{#if child.status === 'running'}
-									<span class="animate-spin inline-block text-muted-foreground">⟳</span>
-								{:else}
-									<span class="text-green-500">✓</span>
-								{/if}
-								<span class="text-muted-foreground">
-									{child.tool_name === 'retrieve_documents' ? 'Sub-agent: searching docs' : child.tool_name}
-									{#if (child.result as {chunk_count?: number})?.chunk_count !== undefined} · {(child.result as {chunk_count: number}).chunk_count} chunks{/if}
-								</span>
-							</span>
-						{/each}
-					</div>
-				{/if}
-			</div>
-		{/each}
-	</div>
-{/if}
 
 {#if showSettings}
 	<SettingsModal onclose={() => (showSettings = false)} />

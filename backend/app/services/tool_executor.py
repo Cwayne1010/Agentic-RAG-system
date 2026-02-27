@@ -24,7 +24,14 @@ async def execute_tool(tool_name: str, arguments: str, user_id: str) -> dict:
         query = args.get("query", "")
         doc_type = args.get("doc_type_filter")
         chunks = await retrieval_service.search(query, doc_type_filter=doc_type, user_id=user_id)
-        sources = list({c["doc_filename"] for c in chunks}) if chunks else []
+        if chunks:
+            source_counts: dict[str, int] = {}
+            for c in chunks:
+                name = c["doc_filename"]
+                source_counts[name] = source_counts.get(name, 0) + 1
+            sources = [{"name": name, "chunks": count} for name, count in source_counts.items()]
+        else:
+            sources = []
 
         if chunks:
             context = "\n\n".join(
@@ -89,8 +96,10 @@ async def execute_tool(tool_name: str, arguments: str, user_id: str) -> dict:
 
     elif tool_name == "web_search":
         query = args.get("query", "")
+        max_results = int(args.get("max_results", 5))
+        max_results = max(1, min(10, max_results))  # clamp to valid range
         try:
-            results = await web_search_service.web_search(query)
+            results = await web_search_service.web_search(query, max_results=max_results)
             context = "\n\n".join(
                 f"[{r['title']}]({r['url']})\n{r['body']}"
                 for r in results

@@ -59,6 +59,7 @@ def has_any_documents() -> bool:
 def update_settings(
     embedding_model: str | None = None,
     chat_model: str | None = None,
+    map_model: str | None = None,
     llm_base_url: str | None = None,
     llm_api_key: str | None = None,
     embedding_base_url: str | None = None,
@@ -84,6 +85,8 @@ def update_settings(
         updates["embedding_model"] = embedding_model
     if chat_model is not None:
         updates["chat_model"] = chat_model
+    if map_model is not None:
+        updates["map_model"] = map_model
     if llm_base_url is not None:
         updates["llm_base_url"] = llm_base_url
     if llm_api_key is not None and llm_api_key != "__REDACTED__":

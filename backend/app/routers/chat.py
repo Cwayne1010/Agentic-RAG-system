@@ -1,10 +1,13 @@
 import asyncio
 import json
+import logging
 import os
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from supabase import create_client
+
+logger = logging.getLogger(__name__)
 
 from app.dependencies import get_current_user
 from app.models.conversation import ChatRequest
@@ -15,16 +18,48 @@ from app.services.openrouter_service import SYSTEM_PROMPT
 from app.services.tool_executor import execute_tool
 
 _MAX_CONTEXT_TOKENS = 100_000  # Conservative budget covering most OpenRouter models
+_MAX_HISTORY_CHARS = 6_000     # ~1,500 tokens — cap each stored message in LLM context
 
+
+async def _with_keepalives(source, interval: float = 10.0):
+    """
+    Wrap an async generator, yielding None as a keepalive marker if the source
+    is silent for `interval` seconds. Allows the caller to flush SSE comments
+    and prevent proxy timeouts during long LLM calls.
+    """
+    it = source.__aiter__()
+    fut = None
+    try:
+        while True:
+            if fut is None:
+                fut = asyncio.ensure_future(it.__anext__())
+            try:
+                item = await asyncio.wait_for(asyncio.shield(fut), timeout=interval)
+                fut = None
+                yield item
+            except asyncio.TimeoutError:
+                yield None  # keepalive marker — caller should flush a comment
+            except StopAsyncIteration:
+                break
+    finally:
+        if fut is not None and not fut.done():
+            fut.cancel()
 
 
 def _trim_to_budget(messages: list[dict]) -> list[dict]:
     """Drop oldest non-system messages until total token count fits within budget."""
     while len(messages) > 2:  # Always keep system msg + at least the last user msg
-        if sum(_token_len(m["content"]) for m in messages) <= _MAX_CONTEXT_TOKENS:
+        if sum(_token_len(m.get("content") or "") for m in messages) <= _MAX_CONTEXT_TOKENS:
             break
         messages.pop(1)
     return messages
+
+
+def _cap_content(content: str | None) -> str | None:
+    """Truncate a message's content to _MAX_HISTORY_CHARS to prevent history bloat."""
+    if not content or len(content) <= _MAX_HISTORY_CHARS:
+        return content
+    return content[:_MAX_HISTORY_CHARS] + "\n[...truncated]"
 
 
 router = APIRouter()
@@ -70,99 +105,170 @@ async def send_message(
 
     async def event_stream():
         full_response = []
+        sent_done = False
+        tool_calls_log: list[dict] = []  # frontend-compatible tool call state for persistence
+        tool_call_offset: int | None = None  # content length when first tool call fired
 
-        # Module 8: Tool-calling loop — LLM decides which tools to call
-        MAX_ITERATIONS = 5
-        messages = [{"role": "system", "content": SYSTEM_PROMPT}]
-        messages += [{"role": m["role"], "content": m["content"]} for m in messages_result.data]
-        messages = _trim_to_budget(messages)
+        try:
+            # Module 8: Tool-calling loop — LLM decides which tools to call
+            MAX_ITERATIONS = 5
+            messages = [{"role": "system", "content": SYSTEM_PROMPT}]
+            # Cap each history message to prevent large sub-agent answers bloating context
+            messages += [{"role": m["role"], "content": _cap_content(m["content"])} for m in messages_result.data]
+            messages = _trim_to_budget(messages)
 
-        for _iteration in range(MAX_ITERATIONS):
-            async for event in traced_stream_chat(
-                messages=messages,
-                conversation_id=conversation_id,
-                use_tools=True,
-                query=body.message,
-            ):
-                if event["type"] == "delta":
-                    full_response.append(event["content"])
-                    yield f"data: {json.dumps({'type': 'delta', 'content': event['content']})}\n\n"
+            for _iteration in range(MAX_ITERATIONS):
+                agent_finished = False
 
-                elif event["type"] == "tool_calls":
-                    tool_calls = event["tool_calls"]
+                async for event in _with_keepalives(traced_stream_chat(
+                    messages=messages,
+                    conversation_id=conversation_id,
+                    use_tools=True,
+                    query=body.message,
+                )):
+                    if event is None:
+                        yield ": keepalive\n\n"
+                        continue
 
-                    # Append LLM's tool_calls to message history
-                    messages.append({
-                        "role": "assistant",
-                        "content": None,
-                        "tool_calls": [
-                            {
-                                "id": tc["id"],
-                                "type": "function",
-                                "function": {"name": tc["name"], "arguments": tc["arguments"]},
-                            }
-                            for tc in tool_calls
-                        ],
-                    })
+                    if event["type"] == "delta":
+                        full_response.append(event["content"])
+                        yield f"data: {json.dumps({'type': 'delta', 'content': event['content']})}\n\n"
 
-                    for tc in tool_calls:
-                        try:
-                            args_parsed = json.loads(tc["arguments"])
-                        except json.JSONDecodeError:
-                            args_parsed = {}
+                    elif event["type"] == "tool_calls":
+                        tool_calls = event["tool_calls"]
 
-                        yield f"data: {json.dumps({'type': 'tool_call', 'tool_name': tc['name'], 'args': args_parsed})}\n\n"
+                        # Record content offset on first tool call
+                        if tool_call_offset is None:
+                            tool_call_offset = len("".join(full_response))
 
-                        if tc["name"] == "spawn_document_agent":
-                            task = args_parsed.get("task", "")
-                            document_name = args_parsed.get("document_name")
-                            tool_message_content = ""
+                        # Append LLM's tool_calls to message history
+                        messages.append({
+                            "role": "assistant",
+                            "content": None,
+                            "tool_calls": [
+                                {
+                                    "id": tc["id"],
+                                    "type": "function",
+                                    "function": {"name": tc["name"], "arguments": tc["arguments"]},
+                                }
+                                for tc in tool_calls
+                            ],
+                        })
 
-                            async for sub_event in document_agent_service.run_agent(task, document_name, str(user.id)):
-                                if sub_event["type"] == "tool_message":
-                                    tool_message_content = sub_event["content"]
-                                else:
-                                    yield f"data: {json.dumps(sub_event)}\n\n"
+                        for tc in tool_calls:
+                            try:
+                                args_parsed = json.loads(tc["arguments"])
+                            except json.JSONDecodeError:
+                                args_parsed = {}
 
-                            messages.append({
-                                "role": "tool",
-                                "tool_call_id": tc["id"],
-                                "content": tool_message_content or "Sub-agent returned no result.",
-                            })
-                        else:
-                            result = await execute_tool(tc["name"], tc["arguments"], str(user.id))
-                            yield f"data: {json.dumps(result['sse_event'])}\n\n"
-                            messages.append({
-                                "role": "tool",
-                                "tool_call_id": tc["id"],
-                                "content": result["tool_message"],
-                            })
+                            yield f"data: {json.dumps({'type': 'tool_call', 'tool_name': tc['name'], 'args': args_parsed})}\n\n"
 
-                elif event["type"] == "done":
-                    if not event.get("tool_calls"):
-                        # Final response — no more tools
-                        break
-            else:
-                continue
-            break  # broke out of inner for → exit outer loop too
+                            if tc["name"] == "spawn_document_agent":
+                                task = args_parsed.get("task", "")
+                                document_name = args_parsed.get("document_name")
+                                sub_children: list[dict] = []
+                                sub_answer = ""
 
-        assembled = "".join(full_response)
+                                async for sub_event in _with_keepalives(
+                                    document_agent_service.run_agent(task, document_name, str(user.id))
+                                ):
+                                    if sub_event is None:
+                                        yield ": keepalive\n\n"
+                                        continue
+                                    if sub_event["type"] == "tool_message":
+                                        pass  # sentinel only — sub_agent_delta already captured
+                                    elif sub_event["type"] == "sub_agent_delta":
+                                        full_response.append(sub_event["content"])
+                                        yield f"data: {json.dumps(sub_event)}\n\n"
+                                    elif sub_event["type"] == "sub_agent_tool_call":
+                                        sub_children.append({
+                                            "tool_name": sub_event["tool_name"],
+                                            "args": sub_event.get("args", {}),
+                                            "status": "running",
+                                        })
+                                        yield f"data: {json.dumps(sub_event)}\n\n"
+                                    elif sub_event["type"] == "sub_agent_tool_result":
+                                        # Mark matching running child as done
+                                        for child in reversed(sub_children):
+                                            if child["tool_name"] == sub_event["tool_name"] and child["status"] == "running":
+                                                child["status"] = "done"
+                                                child["result"] = sub_event
+                                                break
+                                        yield f"data: {json.dumps(sub_event)}\n\n"
+                                    elif sub_event["type"] == "sub_agent_done":
+                                        sub_answer = sub_event.get("answer", "")
+                                        yield f"data: {json.dumps(sub_event)}\n\n"
+                                    else:
+                                        yield f"data: {json.dumps(sub_event)}\n\n"
 
-        # Persist assistant message
-        supabase.table("messages").insert({
-            "conversation_id": conversation_id,
-            "user_id": str(user.id),
-            "role": "assistant",
-            "content": assembled,
-        }).execute()
+                                tool_calls_log.append({
+                                    "tool_name": "spawn_document_agent",
+                                    "args": args_parsed,
+                                    "status": "done",
+                                    "result": {"answer": sub_answer},
+                                    "children": sub_children,
+                                })
 
-        # Auto-title conversation from first message
-        if conversation["title"] == "New Chat":
-            new_title = body.message[:60]
-            supabase.table("conversations").update({"title": new_title}).eq(
-                "id", conversation_id
-            ).execute()
+                                # Sub-agent answered fully — no second Sonnet synthesis needed
+                                agent_finished = True
+                                break  # exit for tc loop
 
-        yield f"data: {json.dumps({'type': 'done'})}\n\n"
+                            else:
+                                result = await execute_tool(tc["name"], tc["arguments"], str(user.id))
+                                yield f"data: {json.dumps(result['sse_event'])}\n\n"
+                                tool_calls_log.append({
+                                    "tool_name": tc["name"],
+                                    "args": args_parsed,
+                                    "status": "done",
+                                    "result": result["sse_event"],
+                                })
+                                messages.append({
+                                    "role": "tool",
+                                    "tool_call_id": tc["id"],
+                                    "content": result["tool_message"],
+                                })
+
+                        if agent_finished:
+                            break  # exit async for event loop → triggers outer break
+
+                    elif event["type"] == "done":
+                        if not event.get("tool_calls"):
+                            # Final response — no more tools
+                            break
+                else:
+                    continue
+                break  # broke out of inner for → exit outer loop too
+
+            assembled = "".join(full_response)
+
+            # Persist assistant message (with tool call metadata if any tools were used)
+            msg_data: dict = {
+                "conversation_id": conversation_id,
+                "user_id": str(user.id),
+                "role": "assistant",
+                "content": assembled,
+            }
+            if tool_calls_log:
+                msg_data["metadata"] = {
+                    "tool_calls": tool_calls_log,
+                    "tool_call_offset": tool_call_offset or 0,
+                }
+            supabase.table("messages").insert(msg_data).execute()
+
+            # Auto-title conversation from first message
+            if conversation["title"] == "New Chat":
+                new_title = body.message[:60]
+                supabase.table("conversations").update({"title": new_title}).eq(
+                    "id", conversation_id
+                ).execute()
+
+            yield f"data: {json.dumps({'type': 'done'})}\n\n"
+            sent_done = True
+
+        except Exception:
+            logger.exception("event_stream error — sending done to unblock client")
+
+        if not sent_done:
+            yield f"data: {json.dumps({'type': 'done'})}\n\n"
 
     return StreamingResponse(event_stream(), media_type="text/event-stream")

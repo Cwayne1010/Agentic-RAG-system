@@ -51,6 +51,17 @@ WEB_SEARCH_TOOL = {
             "type": "object",
             "properties": {
                 "query": {"type": "string", "description": "Web search query"},
+                "max_results": {
+                    "type": "integer",
+                    "description": (
+                        "Number of results to fetch (1–10). "
+                        "Use fewer (1–3) for simple factual lookups like weather or definitions. "
+                        "Use more (6–10) for research or comparison questions. "
+                        "Defaults to 5 if omitted."
+                    ),
+                    "minimum": 1,
+                    "maximum": 10,
+                },
             },
             "required": ["query"],
         },
@@ -175,11 +186,11 @@ async def stream_chat(
     yield {"type": "done", "content": full_content, "tool_calls": tool_calls}
 
 
-async def structured_chat(messages: list[dict]) -> dict:
+async def structured_chat(messages: list[dict], model_override: str | None = None) -> dict:
     """Non-streaming call returning a JSON object (used for map phase in full context mode)."""
     settings = get_settings()
     client = _get_llm_client(settings)
-    model = settings["chat_model"]
+    model = model_override or settings["chat_model"]
 
     response = await client.chat.completions.create(
         model=model,
@@ -187,4 +198,12 @@ async def structured_chat(messages: list[dict]) -> dict:
         response_format={"type": "json_object"},
         extra_headers={"HTTP-Referer": os.getenv("APP_URL", "http://localhost:5173")},
     )
-    return json.loads(response.choices[0].message.content)
+    content = response.choices[0].message.content
+
+    # Handle markdown-wrapped JSON (```json ... ```)
+    if content.startswith("```json\n") and content.endswith("\n```"):
+        content = content[8:-4]  # Remove ```json\n and \n```
+    elif content.startswith("```\n") and content.endswith("\n```"):
+        content = content[4:-4]  # Remove ```\n and \n```
+
+    return json.loads(content)

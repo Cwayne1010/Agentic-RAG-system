@@ -20,6 +20,7 @@ router = APIRouter()
 class SettingsResponse(BaseModel):
     embedding_model: str
     chat_model: str
+    map_model: str
     embedding_locked: bool
     llm_base_url: str
     llm_api_key: str
@@ -34,6 +35,7 @@ class SettingsResponse(BaseModel):
 class SettingsPatch(BaseModel):
     embedding_model: str | None = None
     chat_model: str | None = None
+    map_model: str | None = None
     llm_base_url: str | None = None
     llm_api_key: str | None = None
     embedding_base_url: str | None = None
@@ -73,6 +75,7 @@ async def read_settings(_user=Depends(get_current_user)):
     return SettingsResponse(
         embedding_model=settings["embedding_model"],
         chat_model=settings["chat_model"],
+        map_model=settings.get("map_model", "google/gemini-1.5-flash"),
         embedding_locked=locked,
         llm_base_url=settings.get("llm_base_url", "https://openrouter.ai/api/v1"),
         llm_api_key=_mask(settings.get("llm_api_key", "")),
@@ -91,6 +94,7 @@ async def patch_settings(body: SettingsPatch, _user=Depends(get_current_user)):
         updated = update_settings(
             embedding_model=body.embedding_model,
             chat_model=body.chat_model,
+            map_model=body.map_model,
             llm_base_url=body.llm_base_url,
             llm_api_key=body.llm_api_key,
             embedding_base_url=body.embedding_base_url,
@@ -106,6 +110,7 @@ async def patch_settings(body: SettingsPatch, _user=Depends(get_current_user)):
     return SettingsResponse(
         embedding_model=updated["embedding_model"],
         chat_model=updated["chat_model"],
+        map_model=updated.get("map_model", "google/gemini-1.5-flash"),
         embedding_locked=locked,
         llm_base_url=updated.get("llm_base_url", "https://openrouter.ai/api/v1"),
         llm_api_key=_mask(updated.get("llm_api_key", "")),

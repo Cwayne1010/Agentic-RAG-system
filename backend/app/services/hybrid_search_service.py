@@ -41,6 +41,13 @@ async def hybrid_search(
         bm25_results, vector_results, alpha=alpha
     )
 
+    # Drop low-relevance vector chunks before diversity is applied
+    MIN_VECTOR_SIM = 0.38
+    fused_results = [
+        c for c in fused_results
+        if "bm25" in c.get("found_in", []) or c.get("similarity", 0) >= MIN_VECTOR_SIM
+    ]
+
     # Apply per-document diversity like current retrieval
     diverse_results = _apply_document_diversity(fused_results, top_k)
 
