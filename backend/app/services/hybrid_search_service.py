@@ -42,7 +42,7 @@ async def hybrid_search(
     )
 
     # Drop low-relevance vector chunks before diversity is applied
-    MIN_VECTOR_SIM = 0.38
+    MIN_VECTOR_SIM = 0.30
     fused_results = [
         c for c in fused_results
         if "bm25" in c.get("found_in", []) or c.get("similarity", 0) >= MIN_VECTOR_SIM

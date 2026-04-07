@@ -29,3 +29,7 @@ Thumbs.db
 # IDE
 .vscode/
 .idea/
+
+# Test artifacts
+e2e-screenshots/
+e2e-test-report.md

@@ -1,7 +1,10 @@
 import json
+import logging
 import os
 from supabase import create_client
 from app.services import retrieval_service, web_search_service, text_to_sql_service
+
+logger = logging.getLogger(__name__)
 
 supabase = create_client(os.getenv("SUPABASE_URL"), os.getenv("SUPABASE_SERVICE_ROLE_KEY"))
 
@@ -87,7 +90,7 @@ async def execute_tool(tool_name: str, arguments: str, user_id: str) -> dict:
                 },
             }
         except Exception as e:
-            import traceback; traceback.print_exc()
+            logger.exception("query_database failed")
             return {
                 "tool_name": tool_name,
                 "tool_message": f"Database query failed: {e}",

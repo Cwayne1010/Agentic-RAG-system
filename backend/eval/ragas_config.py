@@ -3,11 +3,16 @@ RAGAS evaluation configuration.
 
 Wires OpenRouter as the judge LLM so no separate API key is needed.
 The judge model should be a capable model (gpt-4o-mini is a good default).
+
+OpenRouter only returns 1 generation per call; RAGAS internally requests n=3
+for statistical sampling. The monkeypatch below pads the response to the
+requested n so context_precision / context_recall score correctly.
 """
 import os
 from langchain_openai import ChatOpenAI, OpenAIEmbeddings
 from ragas.llms import LangchainLLMWrapper
 from ragas.embeddings import LangchainEmbeddingsWrapper
+
 
 _judge_llm = ChatOpenAI(
     model=os.getenv("RAGAS_JUDGE_MODEL", "openai/gpt-4o-mini"),
@@ -22,4 +27,8 @@ _embeddings = OpenAIEmbeddings(
 )
 
 ragas_llm = LangchainLLMWrapper(_judge_llm)
+# OpenRouter ignores n>1 in a single call; bypass_n=True makes RAGAS send
+# n separate requests instead, so context_precision/recall score correctly.
+ragas_llm.bypass_n = True
+
 ragas_embeddings = LangchainEmbeddingsWrapper(_embeddings)

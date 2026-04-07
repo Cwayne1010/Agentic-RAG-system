@@ -73,7 +73,7 @@ Track your progress through the masterclass. Update this file as you complete mo
 
 ### Module 4: Metadata Extraction
 
-- [ ] Task 1: Apply migration 009_document_metadata.sql (metadata JSONB column + updated RPC with JOIN + filter_doc_type)
+- [x] Task 1: Apply migration 009_document_metadata.sql (metadata JSONB column + updated RPC with JOIN + filter_doc_type)
 - [x] Task 2: Create metadata_service.py (DocumentMetadata Pydantic model + extract_metadata LLM call)
 - [x] Task 3: Update ingestion_service.py — call extract_metadata after chunks embedded, store in documents.metadata
 - [x] Task 4: Update retrieval_service.py — add doc_type_filter param, pass to RPC when set
@@ -101,14 +101,14 @@ Track your progress through the masterclass. Update this file as you complete mo
 ### Module 7: Additional Tools
 
 - [x] Task 1: Install duckduckgo-search + update requirements.txt
-- [ ] Task 2: Apply migration 015_text_to_sql_rpc.sql (execute_user_sql RPC) — manual step in Supabase SQL editor
+- [x] Task 2: Apply migration 015_text_to_sql_rpc.sql (execute_user_sql RPC) — manual step in Supabase SQL editor
 - [x] Task 3: Create web_search_service.py (DuckDuckGo async wrapper)
 - [x] Task 4: Create text_to_sql_service.py (NL → SQL → Supabase)
 - [x] Task 5: Create tool_executor.py (dispatch layer)
 - [x] Task 6: Update openrouter_service.py (3 tool definitions, new SYSTEM_PROMPT, ALL_TOOLS)
 - [x] Task 7: Update chat.py (tool-calling loop, remove pre-fetch)
 - [x] Task 8: Update api.ts + +page.svelte (tool_call/tool_result events, pill display)
-- [ ] Task 9: Validation — M7-1 through M7-7 (backend) and M7-UX1/UX2/UX3 (frontend)
+- [x] Task 9: Validation — M7-1 through M7-7 (backend) and M7-UX1/UX2/UX3 (frontend)
 
 ### Module 8: Sub-Agents (Option B) — with full-context retirement
 
@@ -121,3 +121,10 @@ Track your progress through the masterclass. Update this file as you complete mo
 - [x] Task 6: Update MessageInput.svelte — remove full-context toggle UI
 - [x] Task 7: Update +page.svelte — remove fullContextMode, nested pill state + rendering
 - [x] Task 8: Validation — M8-1–M8-5 (backend) and M8-UX1–M8-UX4 (frontend)
+
+### Code Quality
+
+- [x] Svelte 5 reactivity: fixed `state_referenced_locally` warnings (ToolCallDisplay.svelte + documents/+page.svelte)
+- [x] Accessibility: fixed SettingsModal (dialog role, aria-labelledby, label/input for+id pairs)
+- [x] Python best practices documented (`python-best-practices.md`)
+- [x] `svelte-check --threshold warning` reports 0 errors, 0 warnings

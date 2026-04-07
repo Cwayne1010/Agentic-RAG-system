@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
+	import { onMount, untrack } from 'svelte';
 	import { toast } from 'svelte-sonner';
 	import { supabase } from '$lib/supabase';
 	import { uploadDocument, deleteDocument } from '$lib/api';
@@ -14,7 +14,7 @@
 
 	let { data }: { data: PageData } = $props();
 
-	let documents = $state<Document[]>(data.documents);
+	let documents = $state<Document[]>(untrack(() => data.documents));
 	let uploading = $state(false);
 	let showSettings = $state(false);
 	let currentUserId = $state('');
@@ -82,7 +82,7 @@
 	});
 </script>
 
-<div class="flex h-screen overflow-hidden">
+<div class="flex h-screen overflow-hidden min-w-[768px]">
 	<!-- Left sidebar: nav + logout -->
 	<div class="flex h-full w-60 shrink-0 flex-col border-r bg-muted/30">
 		<div class="space-y-1 p-3">

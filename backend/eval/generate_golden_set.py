@@ -22,12 +22,12 @@ openrouter = AsyncOpenAI(api_key=os.getenv("OPENROUTER_API_KEY"), base_url="http
 _PROMPT = """\
 You are a test-set generator for evaluating RAG systems.
 
-Given the document chunks below, generate exactly 10 question-answer pairs that are varied in type:
-- 2 factual recall (specific facts, dates, names)
-- 2 definitional (what is X, what does X mean)
-- 2 cause-and-effect or procedural (why/how)
-- 2 comparative or analytical (differences, relationships)
-- 2 summary or broad (covering multiple ideas)
+Given the document chunks below, generate exactly 40 question-answer pairs that are varied in type:
+- 8 factual recall (specific facts, dates, names)
+- 8 definitional (what is X, what does X mean)
+- 8 cause-and-effect or procedural (why/how)
+- 8 comparative or analytical (differences, relationships)
+- 8 summary or broad (covering multiple ideas)
 
 Rules:
 - Every question must be answerable from the provided chunks alone
@@ -47,7 +47,7 @@ async def main(user_id: str, output: str, model: str):
         .select("id, document_id, chunk_index, content")
         .eq("user_id", user_id)
         .order("document_id")
-        .limit(30)
+        .limit(100)
         .execute()
     )
     chunks = result.data or []
@@ -60,7 +60,7 @@ async def main(user_id: str, output: str, model: str):
         f"[doc={c['document_id'][:8]} chunk={c['chunk_index']}]\n{c['content']}" for c in chunks
     )
 
-    print(f"Generating 10 varied Q&A pairs from {len(chunks)} chunks using {model}...")
+    print(f"Generating 40 varied Q&A pairs from {len(chunks)} chunks using {model}...")
 
     resp = await openrouter.chat.completions.create(
         model=model,

@@ -12,10 +12,14 @@
 		children?: TC[];
 	};
 
-	let { tc, stateKey = '' }: { tc: TC; stateKey?: string } = $props();
+	type Props = { tc: TC; stateKey?: string };
+	let { tc, stateKey = '' }: Props = $props();
 
 	const _storageKey = $derived(stateKey ? `tcd:${stateKey}` : '');
-	let open = $state(stateKey ? localStorage.getItem(`tcd:${stateKey}`) === '1' : false);
+	function initialOpen(): boolean {
+		return stateKey ? localStorage.getItem(`tcd:${stateKey}`) === '1' : false;
+	}
+	let open = $state(initialOpen());
 
 	function toggle() {
 		open = !open;

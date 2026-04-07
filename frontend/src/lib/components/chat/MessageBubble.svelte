@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { fade } from 'svelte/transition';
 	import { marked } from 'marked';
+	import DOMPurify from 'dompurify';
 	import type { Message } from '../../../types';
 	import ToolCallDisplay from './ToolCallDisplay.svelte';
 
@@ -14,7 +15,12 @@
 
 	marked.setOptions({ breaks: true });
 
-	let { message, toolCalls = [] }: { message: Message; toolCalls?: ToolCall[] } = $props();
+	function sanitize(html: string): string {
+		return DOMPurify.sanitize(html);
+	}
+
+	type Props = { message: Message; toolCalls?: ToolCall[] };
+	let { message, toolCalls = [] }: Props = $props();
 
 	const isUser = $derived(message.role === 'user');
 
@@ -26,14 +32,14 @@
 	// Split content at tool call boundary
 	const offset = $derived(message.toolCallOffset);
 	const preContent = $derived(
-		offset !== undefined ? (marked(message.content.slice(0, offset)) as string) : null
+		offset !== undefined ? sanitize(marked(message.content.slice(0, offset)) as string) : null
 	);
 	const postContent = $derived(
 		offset !== undefined && message.content.length > offset
-			? (marked(message.content.slice(offset)) as string)
+			? sanitize(marked(message.content.slice(offset)) as string)
 			: null
 	);
-	const fullContent = $derived(marked(message.content) as string);
+	const fullContent = $derived(sanitize(marked(message.content) as string));
 
 	const hasTools = $derived(visibleToolCalls.length > 0 || preContent !== null);
 

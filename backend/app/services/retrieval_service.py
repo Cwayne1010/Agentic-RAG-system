@@ -1,7 +1,6 @@
 import os
 from supabase import create_client
 
-from .embedding_service import embed_text
 from .hybrid_search_service import hybrid_search, vector_only_search
 
 supabase = create_client(os.getenv("SUPABASE_URL"), os.getenv("SUPABASE_SERVICE_ROLE_KEY"))

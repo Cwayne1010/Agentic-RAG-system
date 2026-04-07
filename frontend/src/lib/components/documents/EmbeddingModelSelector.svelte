@@ -13,7 +13,7 @@
 	let embeddingModel = $state('');
 	let saving = $state(false);
 
-	const dirty = $derived(settings !== null && embeddingModel !== settings.embedding_model);
+	const dirty = $derived(settings !== null && embeddingModel !== (settings as AppSettings).embedding_model);
 
 	onMount(async () => {
 		try {

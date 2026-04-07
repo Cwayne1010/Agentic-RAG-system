@@ -128,23 +128,24 @@
 		}
 	}
 
-	function handleBackdrop(e: MouseEvent) {
-		if (e.target === e.currentTarget) onclose();
-	}
 </script>
 
 <!-- Backdrop -->
 <div
 	class="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
-	role="dialog"
-	aria-modal="true"
-	onclick={handleBackdrop}
+	role="presentation"
+	tabindex="-1"
 >
 	<!-- Panel -->
-	<div class="bg-background relative w-full max-w-lg rounded-xl border shadow-xl">
+	<div
+		role="dialog"
+		aria-modal="true"
+		aria-labelledby="settings-title"
+		class="bg-background relative w-full max-w-lg rounded-xl border shadow-xl"
+	>
 		<!-- Header -->
 		<div class="flex items-center justify-between border-b px-5 py-4">
-			<h2 class="text-sm font-semibold">Settings</h2>
+			<h2 id="settings-title" class="text-sm font-semibold">Settings</h2>
 			<button
 				type="button"
 				onclick={onclose}
@@ -179,20 +180,20 @@
 					<h3 class="mb-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">LLM</h3>
 					<div class="space-y-3">
 						<div>
-							<label class="mb-1 block text-xs text-muted-foreground">Model</label>
-							<Input bind:value={chatModel} placeholder="e.g. google/gemini-2.0-flash" class="h-8 text-sm" />
+							<label for="llm-model" class="mb-1 block text-xs text-muted-foreground">Model</label>
+							<Input id="llm-model" bind:value={chatModel} placeholder="e.g. google/gemini-2.0-flash" class="h-8 text-sm" />
 						</div>
 						<div>
-							<label class="mb-1 block text-xs text-muted-foreground">Map Model <span class="font-normal normal-case">(bulk doc analysis)</span></label>
-							<Input bind:value={mapModel} placeholder="e.g. google/gemini-1.5-flash" class="h-8 text-sm" />
+							<label for="map-model" class="mb-1 block text-xs text-muted-foreground">Map Model <span class="font-normal normal-case">(bulk doc analysis)</span></label>
+							<Input id="map-model" bind:value={mapModel} placeholder="e.g. google/gemini-1.5-flash" class="h-8 text-sm" />
 						</div>
 						<div>
-							<label class="mb-1 block text-xs text-muted-foreground">Base URL</label>
-							<Input bind:value={llmBaseUrl} placeholder="https://openrouter.ai/api/v1" class="h-8 text-sm" />
+							<label for="llm-base-url" class="mb-1 block text-xs text-muted-foreground">Base URL</label>
+							<Input id="llm-base-url" bind:value={llmBaseUrl} placeholder="https://openrouter.ai/api/v1" class="h-8 text-sm" />
 						</div>
 						<div>
-							<label class="mb-1 block text-xs text-muted-foreground">API Key</label>
-							<Input bind:value={llmApiKey} type="password" placeholder={llmApiKeySet ? 'Already set — enter new key to replace' : 'sk-or-…'} class="h-8 text-sm" />
+							<label for="llm-api-key" class="mb-1 block text-xs text-muted-foreground">API Key</label>
+							<Input id="llm-api-key" bind:value={llmApiKey} type="password" placeholder={llmApiKeySet ? 'Already set — enter new key to replace' : 'sk-or-…'} class="h-8 text-sm" />
 						</div>
 					</div>
 				</section>
@@ -209,8 +210,9 @@
 					</h3>
 					<div class="space-y-3">
 						<div>
-							<label class="mb-1 block text-xs text-muted-foreground">Model</label>
+							<label for="embedding-model" class="mb-1 block text-xs text-muted-foreground">Model</label>
 							<Input
+								id="embedding-model"
 								bind:value={embeddingModel}
 								placeholder="e.g. openai/text-embedding-3-small"
 								disabled={settings.embedding_locked}
@@ -218,8 +220,9 @@
 							/>
 						</div>
 						<div>
-							<label class="mb-1 block text-xs text-muted-foreground">Base URL</label>
+							<label for="embedding-base-url" class="mb-1 block text-xs text-muted-foreground">Base URL</label>
 							<Input
+								id="embedding-base-url"
 								bind:value={embeddingBaseUrl}
 								placeholder="https://openrouter.ai/api/v1"
 								disabled={settings.embedding_locked}
@@ -227,8 +230,9 @@
 							/>
 						</div>
 						<div>
-							<label class="mb-1 block text-xs text-muted-foreground">API Key</label>
+							<label for="embedding-api-key" class="mb-1 block text-xs text-muted-foreground">API Key</label>
 							<Input
+								id="embedding-api-key"
 								bind:value={embeddingApiKey}
 								type="password"
 								placeholder={embeddingApiKeySet ? 'Already set — enter new key to replace' : 'sk-or-…'}
@@ -236,8 +240,9 @@
 							/>
 						</div>
 						<div>
-							<label class="mb-1 block text-xs text-muted-foreground">Dimensions</label>
+							<label for="embedding-dimensions" class="mb-1 block text-xs text-muted-foreground">Dimensions</label>
 							<Input
+								id="embedding-dimensions"
 								bind:value={embeddingDimensions}
 								type="number"
 								min="1"

@@ -105,6 +105,7 @@ async def list_documents(user=Depends(get_current_user)):
     result = (
         supabase.table("documents")
         .select("*")
+        .eq("user_id", str(user.id))
         .order("created_at", desc=True)
         .execute()
     )

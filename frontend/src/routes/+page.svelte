@@ -184,7 +184,7 @@ import { toast } from 'svelte-sonner';
 	}
 </script>
 
-<div class="flex h-screen flex-col overflow-hidden">
+<div class="flex h-screen flex-col overflow-hidden min-w-[768px]">
 	<!-- Top area: sidebar + messages -->
 	<div class="flex min-h-0 flex-1 overflow-hidden">
 		<ChatSidebar bind:this={sidebarRef} />

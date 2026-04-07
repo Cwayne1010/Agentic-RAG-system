@@ -25,7 +25,7 @@ load_dotenv(override=True)
 
 from datasets import Dataset
 from ragas import evaluate
-from ragas.metrics import faithfulness, answer_relevancy, context_precision
+from ragas.metrics import faithfulness, answer_relevancy, context_precision, context_recall
 
 from app.services import retrieval_service
 from app.services.openrouter_service import stream_chat, SYSTEM_PROMPT
@@ -36,7 +36,7 @@ async def run_pipeline(question: str, user_id: str) -> tuple[str, list[str]]:
     """Run one question through the live retrieval + LLM pipeline.
     Returns (answer, list_of_retrieved_chunk_texts).
     """
-    chunks = await retrieval_service.search(question, user_id)
+    chunks = await retrieval_service.search(question, user_id=user_id)
 
     context_block = ""
     if chunks:
@@ -46,8 +46,16 @@ async def run_pipeline(question: str, user_id: str) -> tuple[str, list[str]]:
         )
         context_block = f"\n\n<retrieved_context>\n{context_lines}\n</retrieved_context>"
 
+    # Use a minimal system prompt for eval — the full SYSTEM_PROMPT includes
+    # tool-calling instructions that cause the model to emit tool-call XML
+    # even with use_tools=False, which tanks faithfulness and relevancy scores.
+    eval_system = (
+        "You are a helpful assistant. Answer the user's question using only "
+        "the provided context. If the context does not contain the answer, "
+        "say you don't know."
+    )
     messages = [
-        {"role": "system", "content": SYSTEM_PROMPT + context_block},
+        {"role": "system", "content": eval_system + context_block},
         {"role": "user", "content": question},
     ]
 
@@ -65,6 +73,7 @@ _ALL_METRICS = {
     "faithfulness": faithfulness,
     "answer_relevancy": answer_relevancy,
     "context_precision": context_precision,
+    "context_recall": context_recall,
 }
 
 
@@ -112,7 +121,7 @@ def main(user_id: str, golden_set_path: str, output_path: str, tags_filter: list
     })
 
     active_metrics = [_ALL_METRICS[m] for m in (metric_names or list(_ALL_METRICS))]
-    needs_embeddings = answer_relevancy in active_metrics
+    needs_embeddings = any(m in active_metrics for m in [answer_relevancy, context_recall])
 
     print(f"\nRunning RAGAS scoring with metrics: {metric_names or list(_ALL_METRICS)}")
     result = evaluate(

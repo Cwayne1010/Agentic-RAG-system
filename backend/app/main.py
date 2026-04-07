@@ -4,7 +4,7 @@ from dotenv import load_dotenv
 
 load_dotenv(override=True)
 
-from app.routers import conversations, chat, documents, settings, metrics
+from app.routers import conversations, chat, documents, settings, metrics  # noqa: E402
 
 app = FastAPI(title="Agentic RAG Masterclass API")
 
