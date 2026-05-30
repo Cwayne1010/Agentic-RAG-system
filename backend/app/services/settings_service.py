@@ -34,8 +34,7 @@ def _decrypt(value: str) -> str:
     try:
         return _get_cipher().decrypt(value.encode()).decode()
     except (InvalidToken, Exception):
-        # Legacy plain-text value — return as-is during migration period
-        return value
+        return ""
 
 
 def get_settings() -> dict:
