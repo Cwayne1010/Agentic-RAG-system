@@ -1,8 +1,8 @@
 import { supabase } from './supabase';
 import type { Document } from '../types';
-import { env } from '$env/dynamic/public';
+import { PUBLIC_API_URL } from '$env/static/public';
 
-const API_BASE = env.PUBLIC_API_URL ?? '';
+const API_BASE = PUBLIC_API_URL ?? '';
 
 async function getAuthHeader(): Promise<string> {
 	const { data } = await supabase.auth.getSession();
