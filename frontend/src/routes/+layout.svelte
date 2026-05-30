@@ -1,5 +1,5 @@
 <script lang="ts">
-	import '../app.css';
+	import '../App.css';
 	import { onMount } from 'svelte';
 	import { supabase } from '$lib/supabase';
 	import { Toaster } from '$lib/components/ui/sonner';
