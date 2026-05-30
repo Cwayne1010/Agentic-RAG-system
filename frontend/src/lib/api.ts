@@ -1,6 +1,8 @@
 import { supabase } from './supabase';
 import type { Document } from '../types';
 
+const API_BASE = import.meta.env.VITE_API_URL ?? '';
+
 async function getAuthHeader(): Promise<string> {
 	const { data } = await supabase.auth.getSession();
 	const token = data.session?.access_token;
@@ -10,7 +12,7 @@ async function getAuthHeader(): Promise<string> {
 
 export async function apiRequest<T>(path: string, options: RequestInit = {}): Promise<T> {
 	const authorization = await getAuthHeader();
-	const res = await fetch(path, {
+	const res = await fetch(`${API_BASE}${path}`, {
 		...options,
 		headers: {
 			'Content-Type': 'application/json',
@@ -56,7 +58,7 @@ export async function streamChat(
 
 	let response: Response;
 	try {
-		response = await fetch(`/api/conversations/${conversationId}/messages`, {
+		response = await fetch(`${API_BASE}/api/conversations/${conversationId}/messages`, {
 			method: 'POST',
 			headers: {
 				'Content-Type': 'application/json',
@@ -144,7 +146,7 @@ export async function uploadDocument(file: File): Promise<Document> {
 	const authorization = await getAuthHeader();
 	const formData = new FormData();
 	formData.append('file', file);
-	const res = await fetch('/api/documents/upload', {
+	const res = await fetch(`${API_BASE}/api/documents/upload`, {
 		method: 'POST',
 		headers: { Authorization: authorization },
 		body: formData,
